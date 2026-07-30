@@ -105,7 +105,7 @@ router.get("/kpi", (req, res) => {
     const key = keyFor(staff);
     if (!byPerson.has(key)) {
       byPerson.set(key, {
-        name: staff.name, position: staff.position, department: staff.department,
+        key, name: staff.name, position: staff.position, department: staff.department,
         projects: new Set(), assigned: 0, completed: 0, completedOnTime: 0, completedLate: 0,
         overdueOpen: 0, blocked: 0, doing: 0, todo: 0,
       });
@@ -133,6 +133,7 @@ router.get("/kpi", (req, res) => {
   const ranking = Array.from(byPerson.values()).map(a => {
     const score = a.completedOnTime * 3 + a.completedLate * 1 - a.overdueOpen * 2 - a.blocked * 1;
     return {
+      key: a.key,
       name: a.name,
       position: a.position,
       department: a.department,
@@ -152,6 +153,59 @@ router.get("/kpi", (req, res) => {
   ranking.forEach((r, i) => { r.rank = i + 1; });
 
   res.json({ ranking });
+});
+
+/* ---------------- Việc của tôi (mọi dự án) ---------------- */
+
+router.get("/my-tasks", (req, res) => {
+  const myStaff = db.prepare("SELECT * FROM staff WHERE linked_user_id = ?").all(req.user.id);
+  if (myStaff.length === 0) return res.json({ tasks: [] });
+  const staffIds = myStaff.map(s => s.id);
+  const placeholders = staffIds.map(() => "?").join(",");
+  const tasks = db
+    .prepare(
+      `SELECT t.*, p.name AS project_name FROM tasks t
+       JOIN projects p ON p.id = t.project_id
+       WHERE t.assignee_staff_id IN (${placeholders})`
+    )
+    .all(...staffIds);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  res.json({
+    tasks: tasks.map(t => ({
+      id: t.id, title: t.title || "(chưa đặt tên)", status: t.status, due: t.due_date || "",
+      dueLocked: !!t.due_locked, phase: t.phase, projectId: t.project_id, projectName: t.project_name,
+      overdue: !!(t.due_date && t.status !== "done" && t.due_date < todayStr),
+    })),
+  });
+});
+
+/* ---------------- Việc theo từng người (khi bấm vào tên) ---------------- */
+// key: "phone:<sđt>" hoặc "name:<tên>|<phòng ban>" — khớp với keyFor() trong /kpi
+router.get("/by-person", (req, res) => {
+  const key = String(req.query.key || "");
+  if (!key) return res.status(400).json({ error: "Thiếu key" });
+  const projectIds = allProjectIds();
+  if (projectIds.length === 0) return res.json({ tasks: [] });
+  const placeholders = projectIds.map(() => "?").join(",");
+  const allStaff = db.prepare(`SELECT * FROM staff WHERE project_id IN (${placeholders})`).all(...projectIds);
+  const matchStaffIds = allStaff
+    .filter(s => (s.phone ? `phone:${s.phone}` : `name:${s.name}|${s.department}`) === key)
+    .map(s => s.id);
+  if (matchStaffIds.length === 0) return res.json({ tasks: [] });
+  const sPlaceholders = matchStaffIds.map(() => "?").join(",");
+  const projectNameById = new Map(db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds).map(p => [p.id, p.name]));
+  const tasks = db
+    .prepare(`SELECT * FROM tasks WHERE assignee_staff_id IN (${sPlaceholders})`)
+    .all(...matchStaffIds);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  res.json({
+    tasks: tasks.map(t => ({
+      id: t.id, title: t.title || "(chưa đặt tên)", status: t.status, due: t.due_date || "",
+      dueLocked: !!t.due_locked, phase: t.phase, projectId: t.project_id,
+      projectName: projectNameById.get(t.project_id) || "",
+      overdue: !!(t.due_date && t.status !== "done" && t.due_date < todayStr),
+    })),
+  });
 });
 
 module.exports = router;

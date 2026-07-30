@@ -17,17 +17,26 @@ function getMembership(projectId, userId) {
     .get(projectId, userId);
 }
 
+function isSuperAdmin(userId) {
+  const row = db.prepare("SELECT is_super_admin FROM users WHERE id = ?").get(userId);
+  return !!(row && row.is_super_admin);
+}
+
 // Bất kỳ ai đã đăng nhập cũng XEM được mọi dự án trong hệ thống (để các
 // thành viên có thể theo dõi tiến độ dự án khác), nhưng chỉ những quyền cụ
 // thể (`need`) mới cần đúng vai trò trong project_members. `need` là một
 // khoá quyền trong permissions.js (VD: 'editTaskFields', 'editProgress',
 // 'addProcess', 'manageStaff', 'manageMembers', 'manageProject', 'manageLock').
 // Không truyền `need` nghĩa là chỉ cần xem được (view-only) là đủ.
+// Quản trị hệ thống (super admin) luôn có toàn quyền trên MỌI dự án.
 function requireProjectAccess(req, res, projectId, need) {
   const proj = db.prepare("SELECT id FROM projects WHERE id = ?").get(projectId);
   if (!proj) {
     res.status(404).json({ error: "Không tìm thấy dự án" });
     return null;
+  }
+  if (isSuperAdmin(req.user.id)) {
+    return { role: "owner", isMember: true, isSuperAdmin: true };
   }
   const m = getMembership(projectId, req.user.id);
   const role = m ? m.role : "viewer"; // không phải thành viên chính thức -> chỉ xem
@@ -91,6 +100,7 @@ function serializeStaff(s) {
     zaloLinked: !!s.zalo_id,
     zaloLinkCode: s.zalo_link_code || "",
     hasLogin: !!s.linked_user_id,
+    linkedUserId: s.linked_user_id || "",
   };
 }
 
@@ -140,6 +150,7 @@ function fullProject(projectId, viewerRole) {
 // Danh sách TẤT CẢ dự án trong hệ thống — mọi người dùng đã đăng nhập đều
 // xem được để theo dõi tiến độ dự án khác, kèm cờ isMember/role thật của họ.
 router.get("/", (req, res) => {
+  const superAdmin = isSuperAdmin(req.user.id);
   const rows = db
     .prepare(
       `SELECT p.id, p.name, p.created_at,
@@ -150,7 +161,8 @@ router.get("/", (req, res) => {
   res.json({
     projects: rows.map(r => ({
       id: r.id, name: r.name, createdAt: r.created_at,
-      role: r.role || "viewer", isMember: !!r.role,
+      role: superAdmin ? "owner" : (r.role || "viewer"),
+      isMember: superAdmin ? true : !!r.role,
     })),
   });
 });

@@ -181,10 +181,24 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   nhập xem/cập nhật việc của mình, admin có thể **cấp thẳng tài khoản** (số
   điện thoại + mật khẩu + vai trò) ngay khi thêm nhân viên, không cần qua màn
   hình đăng ký.
+- **Quản trị hệ thống (Super Admin)**: người đăng ký đầu tiên của hệ thống tự
+  động có quyền cao nhất — toàn quyền trên MỌI dự án (kể cả khoá/mở khoá hạn),
+  không phụ thuộc có phải thành viên hay không. Có thể cấp/thu hồi quyền này
+  cho người khác trong mục "Quản trị hệ thống" trên header.
 - **Khoá hạn hoàn thành làm căn cứ KPI**: mỗi đầu việc có thể được chủ dự án
   khoá hạn hoàn thành lại — sau khi khoá, không ai (kể cả chủ dự án qua thao
   tác thường) sửa được hạn nữa cho đến khi mở khoá lại, đảm bảo dữ liệu KPI
   không bị chỉnh sửa giữa chừng.
+- **Quản trị hệ thống (Super Admin)**: người đăng ký đầu tiên của hệ thống tự
+  động có quyền cao nhất — toàn quyền trên MỌI dự án (kể cả khoá/mở khoá hạn),
+  không phụ thuộc có phải thành viên hay không. Có thể cấp/thu hồi quyền này
+  cho người khác trong mục "Quản trị hệ thống" trên header.
+- **Việc của tôi & lọc nhanh**: mỗi nhân viên/quản lý có tài khoản đăng nhập
+  thấy ngay nút "Việc của tôi" cùng các lọc nhanh Đang thực hiện / Đã hoàn
+  thành / Trễ hạn ngay trên thanh công cụ, không cần dựng lại bộ lọc mỗi lần.
+- **Bấm vào tên xem việc đang phụ trách**: bấm vào tên nhân viên (mục Nhân
+  viên) hoặc tên trong bảng xếp hạng KPI để xem ngay danh sách công việc đang
+  phụ trách kèm hạn hoàn thành, không cần lọc thủ công.
 
 ## 7. Cập nhật bản đang chạy (nếu đã triển khai trước đó)
 
@@ -259,3 +273,26 @@ Lưu ý: theo chính sách của Zalo, OA chỉ được chủ động gửi tin
 giờ kể từ lần người dùng tương tác gần nhất với OA — nếu nhân viên không nhắn
 tin lại với OA trong thời gian dài, tin nhắc việc có thể không gửi được cho
 đến khi họ tương tác lại.
+
+## 10. Cài đặt lên điện thoại (không cần lên App Store / CH Play)
+
+Ứng dụng giờ là PWA (Progressive Web App) — cài được thẳng lên màn hình chính
+điện thoại như một app riêng, không cần qua App Store/CH Play:
+
+- **Điều kiện bắt buộc**: trang web phải chạy qua **HTTPS** (hoặc `localhost`
+  khi test). PWA sẽ không cài được nếu chạy HTTP thuần trên domain thật — xem
+  lại mục 4 về việc đặt Nginx/Caddy để bật HTTPS miễn phí.
+- **Android (Chrome)**: mở link ứng dụng → trình duyệt tự hiện banner "Thêm
+  vào Màn hình chính" / "Cài đặt ứng dụng", hoặc vào menu (⋮) → "Cài đặt ứng
+  dụng".
+- **iPhone/iPad (Safari)**: mở link ứng dụng → bấm nút Chia sẻ (hình vuông có
+  mũi tên) → "Thêm vào MH chính" (Add to Home Screen). iOS không tự hiện
+  banner như Android, phải làm thao tác này thủ công.
+- Sau khi cài, ứng dụng mở toàn màn hình như app thường, có icon riêng, không
+  hiện thanh địa chỉ trình duyệt.
+- Dữ liệu dự án luôn được tải mới từ server (không cache), chỉ phần giao diện
+  (JS/CSS/icon) được cache nhẹ để mở nhanh hơn ở lần sau — xem
+  `client/public/sw.js` nếu muốn tuỳ chỉnh.
+- Icon mặc định là icon tạm (chữ "NAM" nền xanh) — nên thay bằng logo thật của
+  công ty tại `client/public/icon-192.png`, `icon-512.png`,
+  `icon-maskable-512.png` (giữ nguyên tên file và kích thước).

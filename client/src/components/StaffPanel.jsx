@@ -3,6 +3,7 @@ import { Users2, X, Plus, Trash2, Pencil, MessageCircle, Link2Off, KeyRound } fr
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 import { ROLE_OPTIONS } from "../constants";
+import PersonTasksModal from "./PersonTasksModal";
 
 const emptyForm = { name: "", position: "", department: "", email: "", phone: "" };
 const emptyLogin = { grantLogin: false, loginPhone: "", loginPassword: "", role: "viewer" };
@@ -14,6 +15,7 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [zaloCodeFor, setZaloCodeFor] = useState(null); // { staffId, code }
+  const [tasksFor, setTasksFor] = useState(null); // staff object, để xem việc đang phụ trách
 
   async function handleGetZaloCode(staffId) {
     try {
@@ -100,7 +102,7 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
             <div key={s.id} className="staff-block">
               <div className="member-row staff-row">
                 <div className="member-info">
-                  <span className="member-name">{s.name}</span>
+                  <span className="member-name member-name-clickable" onClick={() => setTasksFor(s)}>{s.name}</span>
                   <span className="member-email">
                     {[s.position, s.department].filter(Boolean).join(" · ") || "—"}
                     {s.email ? ` · ${s.email}` : ""}
@@ -183,6 +185,14 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
           </form>
         )}
       </div>
+
+      {tasksFor && (
+        <PersonTasksModal
+          name={tasksFor.name}
+          staticTasks={(project.tasks || []).filter(t => t.progress.assigneeStaffId === tasksFor.id)}
+          onClose={() => setTasksFor(null)}
+        />
+      )}
     </div>
   );
 }

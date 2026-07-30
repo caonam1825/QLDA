@@ -21,12 +21,18 @@ router.post("/register", (req, res) => {
   const existing = db.prepare("SELECT id FROM users WHERE phone = ?").get(normalizedPhone);
   if (existing) return res.status(409).json({ error: "Số điện thoại này đã được đăng ký" });
 
+  // Người đăng ký đầu tiên của hệ thống tự động là Quản trị hệ thống (quyền
+  // cao nhất, vượt qua mọi phân quyền theo dự án) — để luôn có ít nhất 1
+  // người quản lý được toàn bộ ngay từ đầu.
+  const userCount = db.prepare("SELECT COUNT(*) AS c FROM users").get().c;
+  const isSuperAdmin = userCount === 0 ? 1 : 0;
+
   const id = nanoid();
   db.prepare(
-    "INSERT INTO users (id, phone, email, password_hash, name, created_at) VALUES (?, ?, ?, ?, ?, ?)"
-  ).run(id, normalizedPhone, (email && email.trim()) || null, hashPassword(password), name.trim(), Date.now());
+    "INSERT INTO users (id, phone, email, password_hash, name, is_super_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, normalizedPhone, (email && email.trim()) || null, hashPassword(password), name.trim(), isSuperAdmin, Date.now());
 
-  const user = { id, phone: normalizedPhone, email: (email && email.trim()) || "", name: name.trim() };
+  const user = { id, phone: normalizedPhone, email: (email && email.trim()) || "", name: name.trim(), isSuperAdmin: !!isSuperAdmin };
   res.json({ token: signToken(user), user });
 });
 
@@ -38,14 +44,14 @@ router.post("/login", (req, res) => {
   if (!row || !checkPassword(password, row.password_hash)) {
     return res.status(401).json({ error: "Số điện thoại hoặc mật khẩu không đúng" });
   }
-  const user = { id: row.id, phone: row.phone, email: row.email || "", name: row.name };
+  const user = { id: row.id, phone: row.phone, email: row.email || "", name: row.name, isSuperAdmin: !!row.is_super_admin };
   res.json({ token: signToken(user), user });
 });
 
 router.get("/me", requireAuth, (req, res) => {
-  const row = db.prepare("SELECT id, phone, email, name FROM users WHERE id = ?").get(req.user.id);
+  const row = db.prepare("SELECT id, phone, email, name, is_super_admin FROM users WHERE id = ?").get(req.user.id);
   if (!row) return res.status(404).json({ error: "Không tìm thấy người dùng" });
-  res.json({ user: { ...row, email: row.email || "" } });
+  res.json({ user: { ...row, email: row.email || "", isSuperAdmin: !!row.is_super_admin } });
 });
 
 // Cập nhật thông tin cá nhân (đổi tên / email hiển thị). Đổi số điện thoại đăng
@@ -60,8 +66,8 @@ router.patch("/me", requireAuth, (req, res) => {
     vals.push(req.user.id);
     db.prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
   }
-  const row = db.prepare("SELECT id, phone, email, name FROM users WHERE id = ?").get(req.user.id);
-  res.json({ user: { ...row, email: row.email || "" } });
+  const row = db.prepare("SELECT id, phone, email, name, is_super_admin FROM users WHERE id = ?").get(req.user.id);
+  res.json({ user: { ...row, email: row.email || "", isSuperAdmin: !!row.is_super_admin } });
 });
 
 module.exports = router;

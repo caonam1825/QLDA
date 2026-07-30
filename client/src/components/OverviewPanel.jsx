@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { LayoutGrid, X, AlertTriangle, Clock3, Trophy } from "lucide-react";
 import { api } from "../api";
+import PersonTasksModal from "./PersonTasksModal";
 
 export default function OverviewPanel({ onClose }) {
   const [tab, setTab] = useState("overview"); // 'overview' | 'kpi'
@@ -8,6 +9,7 @@ export default function OverviewPanel({ onClose }) {
   const [kpi, setKpi] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [personFor, setPersonFor] = useState(null); // { key, name }
 
   useEffect(() => {
     let cancelled = false;
@@ -116,7 +118,10 @@ export default function OverviewPanel({ onClose }) {
                     {kpi.ranking.map(r => (
                       <tr key={`${r.name}-${r.department}`} className={r.rank <= 3 ? "report-row-top" : ""}>
                         <td>{r.rank}</td>
-                        <td>{r.name}{r.position ? <span className="report-item-meta-inline"> · {r.position}</span> : ""}</td>
+                        <td>
+                          <span className="member-name-clickable" onClick={() => setPersonFor({ key: r.key, name: r.name })}>{r.name}</span>
+                          {r.position ? <span className="report-item-meta-inline"> · {r.position}</span> : ""}
+                        </td>
                         <td>{r.projects.join(", ")}</td>
                         <td>{r.assigned}</td>
                         <td>{r.completed} ({r.completionRate}%)</td>
@@ -132,6 +137,10 @@ export default function OverviewPanel({ onClose }) {
           </div>
         )}
       </div>
+
+      {personFor && (
+        <PersonTasksModal name={personFor.name} personKey={personFor.key} onClose={() => setPersonFor(null)} />
+      )}
     </div>
   );
 }

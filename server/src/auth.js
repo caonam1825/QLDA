@@ -31,4 +31,15 @@ function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { hashPassword, checkPassword, signToken, requireAuth };
+function requireSuperAdmin(req, res, next) {
+  // Luôn kiểm tra tươi trong DB (không dựa vào JWT) để thu hồi quyền có hiệu
+  // lực ngay, không phải chờ người dùng đăng nhập lại.
+  const db = require("./db");
+  const row = db.prepare("SELECT is_super_admin FROM users WHERE id = ?").get(req.user.id);
+  if (!row || !row.is_super_admin) {
+    return res.status(403).json({ error: "Chỉ Quản trị hệ thống mới có quyền thực hiện thao tác này" });
+  }
+  next();
+}
+
+module.exports = { hashPassword, checkPassword, signToken, requireAuth, requireSuperAdmin };

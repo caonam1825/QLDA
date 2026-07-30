@@ -392,3 +392,18 @@ body {
 .due-lock-btn:hover { background: var(--gold-soft); color: var(--gold); border-color: var(--gold); }
 .spin { animation: spin 1s linear infinite; display: inline-block; vertical-align: -2px; }
 @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+/* --- Lọc nhanh & tên bấm được --- */
+.quick-filter-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.quick-filter-chip {
+  font-size: 12px; padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line);
+  background: #fff; color: var(--slate); cursor: pointer;
+}
+.quick-filter-chip:hover { background: var(--paper); }
+.quick-filter-chip-active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.quick-filter-chip-danger.quick-filter-chip-active { background: var(--seal); border-color: var(--seal); }
+.member-name-clickable { cursor: pointer; text-decoration: underline dotted; text-underline-offset: 3px; }
+.member-name-clickable:hover { color: var(--navy); }
+
+.members-btn-admin { border-color: var(--gold); color: var(--gold); }
+.members-btn-admin:hover { background: var(--gold-soft); }

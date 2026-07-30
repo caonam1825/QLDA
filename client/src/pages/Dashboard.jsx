@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
-  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye,
+  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
 } from "lucide-react";
 import { api, setToken } from "../api";
-import { PHASES, STATUS } from "../constants";
+import { PHASES, STATUS, isOverdue } from "../constants";
 import { SealBadge, StatCard } from "../components/Basics";
 import { PhaseBlock } from "../components/GroupPhaseBlocks";
 import ProjectSwitcher from "../components/ProjectSwitcher";
@@ -12,6 +12,7 @@ import MembersPanel from "../components/MembersPanel";
 import StaffPanel from "../components/StaffPanel";
 import ReportPanel from "../components/ReportPanel";
 import OverviewPanel from "../components/OverviewPanel";
+import AdminPanel from "../components/AdminPanel";
 import NextSteps from "../components/NextSteps";
 
 const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
@@ -27,11 +28,13 @@ export default function Dashboard({ user, onLogout }) {
   const [phaseFilter, setPhaseFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [unitFilter, setUnitFilter] = useState("ALL");
+  const [quickFilter, setQuickFilter] = useState("all"); // 'all' | 'mine' | 'doing' | 'done' | 'overdue'
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [membersOpen, setMembersOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
 
   const loadProjectList = useCallback(async (preferId) => {
@@ -133,6 +136,11 @@ export default function Dashboard({ user, onLogout }) {
     return Array.from(s).sort((a, b) => a.localeCompare(b, "vi"));
   }, [project]);
 
+  const myStaffIds = useMemo(() => {
+    if (!project) return [];
+    return project.staff.filter(s => s.linkedUserId === user.id).map(s => s.id);
+  }, [project, user.id]);
+
   const filteredTasks = useMemo(() => {
     if (!project) return [];
     const q = query.trim().toLowerCase();
@@ -140,15 +148,19 @@ export default function Dashboard({ user, onLogout }) {
       if (phaseFilter !== "ALL" && t.phase !== phaseFilter) return false;
       if (unitFilter !== "ALL" && t.unitDo !== unitFilter) return false;
       if (statusFilter !== "ALL" && t.progress.status !== statusFilter) return false;
+      if (quickFilter === "mine" && !myStaffIds.includes(t.progress.assigneeStaffId)) return false;
+      if (quickFilter === "doing" && t.progress.status !== "doing") return false;
+      if (quickFilter === "done" && t.progress.status !== "done") return false;
+      if (quickFilter === "overdue" && !isOverdue(t.progress.due, t.progress.status)) return false;
       if (q) {
         const hay = `${t.title} ${t.unitDo} ${t.unitCoord}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
     });
-  }, [project, query, phaseFilter, statusFilter, unitFilter]);
+  }, [project, query, phaseFilter, statusFilter, unitFilter, quickFilter, myStaffIds]);
 
-  const filtersActive = query.trim() !== "" || statusFilter !== "ALL" || unitFilter !== "ALL";
+  const filtersActive = query.trim() !== "" || statusFilter !== "ALL" || unitFilter !== "ALL" || quickFilter !== "all";
 
   const grouped = useMemo(() => {
     if (!project) return [];
@@ -187,7 +199,7 @@ export default function Dashboard({ user, onLogout }) {
   }, [project]);
 
   const activeFilterCount = [
-    phaseFilter !== "ALL", statusFilter !== "ALL", unitFilter !== "ALL", query.trim() !== "",
+    phaseFilter !== "ALL", statusFilter !== "ALL", unitFilter !== "ALL", query.trim() !== "", quickFilter !== "all",
   ].filter(Boolean).length;
 
   if (loading || !project) {
@@ -227,6 +239,11 @@ export default function Dashboard({ user, onLogout }) {
               <button className="members-btn" onClick={() => setOverviewOpen(true)} type="button">
                 <LayoutGrid size={14} /> Tổng hợp &amp; KPI
               </button>
+              {user.isSuperAdmin && (
+                <button className="members-btn members-btn-admin" onClick={() => setAdminOpen(true)} type="button">
+                  <ShieldCheck size={14} /> Quản trị hệ thống
+                </button>
+              )}
             </div>
             <p>
               Đấu thầu lựa chọn nhà đầu tư dự án có sử dụng đất — theo dõi &amp; giao việc cùng đồng nghiệp theo thời gian thực.
@@ -278,6 +295,35 @@ export default function Dashboard({ user, onLogout }) {
 
         <NextSteps project={project} />
 
+        <div className="quick-filter-row">
+          {myStaffIds.length > 0 && (
+            <button
+              className={`quick-filter-chip ${quickFilter === "mine" ? "quick-filter-chip-active" : ""}`}
+              onClick={() => setQuickFilter(f => f === "mine" ? "all" : "mine")} type="button"
+            >
+              Việc của tôi
+            </button>
+          )}
+          <button
+            className={`quick-filter-chip ${quickFilter === "doing" ? "quick-filter-chip-active" : ""}`}
+            onClick={() => setQuickFilter(f => f === "doing" ? "all" : "doing")} type="button"
+          >
+            Đang thực hiện
+          </button>
+          <button
+            className={`quick-filter-chip ${quickFilter === "done" ? "quick-filter-chip-active" : ""}`}
+            onClick={() => setQuickFilter(f => f === "done" ? "all" : "done")} type="button"
+          >
+            Đã hoàn thành
+          </button>
+          <button
+            className={`quick-filter-chip quick-filter-chip-danger ${quickFilter === "overdue" ? "quick-filter-chip-active" : ""}`}
+            onClick={() => setQuickFilter(f => f === "overdue" ? "all" : "overdue")} type="button"
+          >
+            Trễ hạn
+          </button>
+        </div>
+
         <div className="toolbar">
           <div className="search-box">
             <Search size={15} />
@@ -300,7 +346,7 @@ export default function Dashboard({ user, onLogout }) {
           </select>
 
           {activeFilterCount > 0 && (
-            <button className="clear-filters" onClick={() => { setQuery(""); setPhaseFilter("ALL"); setStatusFilter("ALL"); setUnitFilter("ALL"); }} type="button">
+            <button className="clear-filters" onClick={() => { setQuery(""); setPhaseFilter("ALL"); setStatusFilter("ALL"); setUnitFilter("ALL"); setQuickFilter("all"); }} type="button">
               <X size={13} /> Xoá lọc ({activeFilterCount})
             </button>
           )}
@@ -372,6 +418,10 @@ export default function Dashboard({ user, onLogout }) {
 
       {overviewOpen && (
         <OverviewPanel onClose={() => setOverviewOpen(false)} />
+      )}
+
+      {adminOpen && (
+        <AdminPanel currentUserId={user.id} onClose={() => setAdminOpen(false)} />
       )}
     </div>
   );

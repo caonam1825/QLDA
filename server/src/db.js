@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT,
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
+  is_super_admin INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
@@ -140,6 +141,7 @@ if (!userCols.includes("phone")) {
       email TEXT,
       password_hash TEXT NOT NULL,
       name TEXT NOT NULL,
+      is_super_admin INTEGER NOT NULL DEFAULT 0,
       created_at INTEGER NOT NULL
     );
     INSERT INTO users (id, phone, email, password_hash, name, created_at)
@@ -150,6 +152,17 @@ if (!userCols.includes("phone")) {
     "[migration] Đã thêm số điện thoại đăng nhập. Tài khoản cũ có số điện thoại " +
     "tạm là 'cần-cập-nhật-<id>' — vào phần đổi thông tin cá nhân (hoặc DB) để cập nhật số thật."
   );
+}
+
+// Safe migration for databases created before "Quản trị hệ thống" (super admin) existed.
+// Re-query columns here in case the block above just rebuilt the table.
+const userColsNow = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (!userColsNow.includes("is_super_admin")) {
+  db.exec("ALTER TABLE users ADD COLUMN is_super_admin INTEGER NOT NULL DEFAULT 0");
+  // Gán quyền Quản trị hệ thống cho người dùng đầu tiên (theo ngày tạo) để hệ
+  // thống luôn có ít nhất 1 người có quyền cao nhất sau khi nâng cấp.
+  const first = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get();
+  if (first) db.prepare("UPDATE users SET is_super_admin = 1 WHERE id = ?").run(first.id);
 }
 
 module.exports = db;

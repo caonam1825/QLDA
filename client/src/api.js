@@ -59,6 +59,11 @@ export const api = {
   getReport: (projectId, range) => request("GET", `/projects/${projectId}/report?range=${range}`),
   getOverview: () => request("GET", "/reports/overview"),
   getKPI: () => request("GET", "/reports/kpi"),
+  getMyTasks: () => request("GET", "/reports/my-tasks"),
+  getByPerson: (key) => request("GET", `/reports/by-person?key=${encodeURIComponent(key)}`),
+
+  adminListUsers: () => request("GET", "/admin/users"),
+  adminSetSuperAdmin: (userId, value) => request("PATCH", `/admin/users/${userId}/super-admin`, { value }),
 
   addGroup: (projectId, phase, name) => request("POST", `/projects/${projectId}/groups`, { phase, name }),
   renameGroup: (groupId, name) => request("PATCH", `/projects/groups/${groupId}`, { name }),
