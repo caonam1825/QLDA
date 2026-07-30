@@ -4,7 +4,7 @@ import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 
 export default function MembersPanel({ project, isOwner, onClose, onChanged }) {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [role, setRole] = useState("editor");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -14,8 +14,8 @@ export default function MembersPanel({ project, isOwner, onClose, onChanged }) {
     setError("");
     setBusy(true);
     try {
-      await api.addMember(project.id, email.trim(), role);
-      setEmail("");
+      await api.addMember(project.id, phone.trim(), role);
+      setPhone("");
       onChanged();
     } catch (err) {
       setError(err.message || "Không thể thêm thành viên");
@@ -46,7 +46,7 @@ export default function MembersPanel({ project, isOwner, onClose, onChanged }) {
             <div key={m.id} className="member-row">
               <div className="member-info">
                 <span className="member-name">{m.name}</span>
-                <span className="member-email">{m.email}</span>
+                <span className="member-email">{m.phone}{m.email ? ` · ${m.email}` : ""}</span>
               </div>
               <span className={`member-role member-role-${m.role}`}>
                 {m.role === "owner" ? "Chủ dự án" : m.role === "viewer" ? "Chỉ xem" : "Chỉnh sửa"}
@@ -62,8 +62,8 @@ export default function MembersPanel({ project, isOwner, onClose, onChanged }) {
           <form className="invite-form" onSubmit={handleInvite}>
             <div className="invite-form-row">
               <input
-                type="email" placeholder="Email người đã có tài khoản…" required
-                value={email} onChange={e => setEmail(e.target.value)}
+                type="tel" placeholder="Số điện thoại người đã có tài khoản…" required
+                value={phone} onChange={e => setPhone(e.target.value)}
               />
               <select value={role} onChange={e => setRole(e.target.value)}>
                 <option value="editor">Chỉnh sửa</option>
@@ -71,7 +71,7 @@ export default function MembersPanel({ project, isOwner, onClose, onChanged }) {
               </select>
               <button type="submit" disabled={busy}><Plus size={14} /> Thêm</button>
             </div>
-            <p className="invite-hint">Người được mời cần đã đăng ký tài khoản trên hệ thống này bằng đúng email trên.</p>
+            <p className="invite-hint">Người được mời cần đã đăng ký tài khoản trên hệ thống này bằng đúng số điện thoại trên.</p>
             {error && <div className="auth-error">{error}</div>}
           </form>
         )}

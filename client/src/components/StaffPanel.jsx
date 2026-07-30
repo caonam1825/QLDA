@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Users2, X, Plus, Trash2, Pencil } from "lucide-react";
+import { Users2, X, Plus, Trash2, Pencil, MessageCircle, Link2Off } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 
@@ -10,6 +10,26 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [zaloCodeFor, setZaloCodeFor] = useState(null); // { staffId, code }
+
+  async function handleGetZaloCode(staffId) {
+    try {
+      const { code } = await api.getZaloCode(staffId);
+      setZaloCodeFor({ staffId, code });
+    } catch (err) {
+      setError(err.message || "Không lấy được mã liên kết Zalo");
+    }
+  }
+
+  async function handleUnlinkZalo(staffId) {
+    try {
+      await api.unlinkZalo(staffId);
+      if (zaloCodeFor?.staffId === staffId) setZaloCodeFor(null);
+      onChanged();
+    } catch (err) {
+      setError(err.message || "Không huỷ được liên kết Zalo");
+    }
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -60,19 +80,36 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
             <p className="invite-hint">Chưa có nhân viên nào. Thêm để có thể gán công việc và xem báo cáo theo từng người.</p>
           )}
           {project.staff.map(s => (
-            <div key={s.id} className="member-row staff-row">
-              <div className="member-info">
-                <span className="member-name">{s.name}</span>
-                <span className="member-email">
-                  {[s.position, s.department].filter(Boolean).join(" · ") || "—"}
-                  {s.email ? ` · ${s.email}` : ""}
+            <div key={s.id} className="staff-block">
+              <div className="member-row staff-row">
+                <div className="member-info">
+                  <span className="member-name">{s.name}</span>
+                  <span className="member-email">
+                    {[s.position, s.department].filter(Boolean).join(" · ") || "—"}
+                    {s.email ? ` · ${s.email}` : ""}
+                  </span>
+                </div>
+                <span className={`zalo-status ${s.zaloLinked ? "zalo-status-on" : "zalo-status-off"}`}>
+                  <MessageCircle size={12} /> {s.zaloLinked ? "Đã liên kết Zalo" : "Chưa liên kết Zalo"}
                 </span>
+                {!readOnly && (
+                  <>
+                    {s.zaloLinked ? (
+                      <button className="icon-btn" title="Huỷ liên kết Zalo" onClick={() => handleUnlinkZalo(s.id)} type="button"><Link2Off size={13} /></button>
+                    ) : (
+                      <button className="icon-btn" title="Lấy mã liên kết Zalo" onClick={() => handleGetZaloCode(s.id)} type="button"><MessageCircle size={13} /></button>
+                    )}
+                    <button className="icon-btn" title="Sửa" onClick={() => startEdit(s)} type="button"><Pencil size={13} /></button>
+                    <ConfirmButton icon={Trash2} title="Xoá nhân viên" confirmLabel="Xoá?" danger onConfirm={() => handleDelete(s.id)} />
+                  </>
+                )}
               </div>
-              {!readOnly && (
-                <>
-                  <button className="icon-btn" title="Sửa" onClick={() => startEdit(s)} type="button"><Pencil size={13} /></button>
-                  <ConfirmButton icon={Trash2} title="Xoá nhân viên" confirmLabel="Xoá?" danger onConfirm={() => handleDelete(s.id)} />
-                </>
+              {zaloCodeFor?.staffId === s.id && (
+                <div className="zalo-code-hint">
+                  Nhờ <b>{s.name}</b> mở Zalo, tìm Official Account của công ty và nhắn đúng mã:
+                  {" "}<code className="zalo-code">{zaloCodeFor.code}</code>
+                  {" "}— hệ thống sẽ tự liên kết trong ít phút. (Cần đã cấu hình Zalo OA — xem README.)
+                </div>
               )}
             </div>
           ))}

@@ -3,7 +3,7 @@ import { LogIn } from "lucide-react";
 import { api, setToken } from "../api";
 
 export default function Login({ onAuthed, goRegister }) {
-  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -13,7 +13,7 @@ export default function Login({ onAuthed, goRegister }) {
     setError("");
     setLoading(true);
     try {
-      const { token, user } = await api.login(email.trim(), password);
+      const { token, user } = await api.login(phone.trim(), password);
       setToken(token);
       onAuthed(user);
     } catch (err) {
@@ -31,8 +31,8 @@ export default function Login({ onAuthed, goRegister }) {
         <p className="auth-sub">Quản lý &amp; giao việc theo dự án — nhiều người cùng dùng chung.</p>
 
         <label className="auth-field">
-          <span>Email</span>
-          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} autoFocus />
+          <span>Số điện thoại</span>
+          <input type="tel" placeholder="VD: 0912345678" required value={phone} onChange={e => setPhone(e.target.value)} autoFocus />
         </label>
         <label className="auth-field">
           <span>Mật khẩu</span>

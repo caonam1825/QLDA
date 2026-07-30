@@ -350,3 +350,26 @@ body {
 .report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
 .report-table th { color: var(--slate); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
 .report-cell-danger { color: var(--seal); font-weight: 700; }
+
+/* --- Zalo linking (StaffPanel) --- */
+.staff-block { display: flex; flex-direction: column; gap: 6px; }
+.zalo-status {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; padding: 3px 8px; border-radius: 999px; white-space: nowrap;
+}
+.zalo-status-on { background: var(--teal-soft); color: var(--teal); }
+.zalo-status-off { background: var(--paper); color: var(--slate); border: 1px solid var(--line); }
+.zalo-code-hint {
+  font-size: 12px; color: var(--slate); background: var(--gold-soft);
+  border: 1px solid var(--gold); border-radius: 6px; padding: 8px 10px; margin: 0 10px 6px;
+}
+.zalo-code {
+  font-family: "IBM Plex Mono", monospace; font-weight: 600; letter-spacing: 0.06em;
+  background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 1px 6px;
+}
+
+/* --- Tổng hợp / KPI --- */
+.report-table-total td { font-weight: 600; border-top: 2px solid var(--ink); }
+.report-row-top { background: var(--gold-soft); }
+.report-cell-score { font-weight: 600; font-family: "IBM Plex Mono", monospace; }
+.report-item-meta-inline { color: var(--slate); font-weight: 400; }

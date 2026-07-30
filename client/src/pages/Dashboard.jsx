@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
-  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3,
+  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS } from "../constants";
@@ -11,6 +11,7 @@ import ProjectSwitcher from "../components/ProjectSwitcher";
 import MembersPanel from "../components/MembersPanel";
 import StaffPanel from "../components/StaffPanel";
 import ReportPanel from "../components/ReportPanel";
+import OverviewPanel from "../components/OverviewPanel";
 import NextSteps from "../components/NextSteps";
 
 export default function Dashboard({ user, onLogout }) {
@@ -28,6 +29,7 @@ export default function Dashboard({ user, onLogout }) {
   const [membersOpen, setMembersOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [overviewOpen, setOverviewOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
 
   const loadProjectList = useCallback(async (preferId) => {
@@ -217,6 +219,9 @@ export default function Dashboard({ user, onLogout }) {
                 <BarChart3 size={14} /> Báo cáo
                 {stats.overdue > 0 && <span className="header-badge">{stats.overdue}</span>}
               </button>
+              <button className="members-btn" onClick={() => setOverviewOpen(true)} type="button">
+                <LayoutGrid size={14} /> Tổng hợp &amp; KPI
+              </button>
             </div>
             <p>
               Đấu thầu lựa chọn nhà đầu tư dự án có sử dụng đất — theo dõi &amp; giao việc cùng đồng nghiệp theo thời gian thực.
@@ -246,13 +251,12 @@ export default function Dashboard({ user, onLogout }) {
           <div className="notice-band">
             <Landmark size={18} className="notice-icon" />
             <div className="notice-text">
-              <b>Lưu ý về căn cứ pháp lý:</b> Nội dung mẫu trích từ hồ sơ gốc, dựa trên Luật Đất đai 2013,
-              Luật Đấu thầu 2013 và các nghị định như 43/2014, 47/2014, 44/2014, 25/2020, 31/2021/NĐ-CP.
-              Từ 01/8/2024, Luật Đất đai 2024 đã thay thế các nghị định về giá đất, bồi thường – hỗ trợ – tái định cư,
-              đăng ký đất đai (nay là NĐ 71/2024, 88/2024, 101/2024/NĐ-CP…); Nghị định 25/2020 về lựa chọn nhà đầu tư
-              cũng đang được thay thế theo Luật Đấu thầu 2023 (NĐ 23/2024/NĐ-CP). Luật Nhà ở 2023 và Luật Kinh doanh
-              Bất động sản 2023 cũng đã có hiệu lực. Vui lòng đối chiếu quy định hiện hành hoặc tham vấn đơn vị pháp
-              chế trước khi áp dụng cho dự án thực tế.
+              <b>Lưu ý về căn cứ pháp lý:</b> Nội dung mẫu đã cập nhật theo Luật Đầu tư 143/2025/QH15, Luật Đất đai 2024,
+              Luật Xây dựng 135/2025/QH15, Luật Quy hoạch đô thị và nông thôn 47/2024/QH15 cùng các nghị định hướng dẫn
+              ban hành 2025–2026 (NĐ 96/2026, NĐ 217/2026, NĐ 178/2025, NĐ 102/2024, NĐ 49/2026…). Một số văn bản có
+              mốc hiệu lực riêng (VD NĐ 96/2026/NĐ-CP có hiệu lực từ 31/03/2026). Đây là dữ liệu tổng hợp tham khảo ban
+              đầu — vui lòng đối chiếu quy định hiện hành hoặc tham vấn đơn vị pháp chế trước khi áp dụng cho dự án
+              thực tế.
             </div>
             <button className="notice-close" onClick={() => setNoticeOpen(false)} aria-label="Đóng"><X size={15} /></button>
           </div>
@@ -356,6 +360,10 @@ export default function Dashboard({ user, onLogout }) {
 
       {reportOpen && (
         <ReportPanel projectId={currentId} onClose={() => setReportOpen(false)} />
+      )}
+
+      {overviewOpen && (
+        <OverviewPanel onClose={() => setOverviewOpen(false)} />
       )}
     </div>
   );

@@ -32,9 +32,10 @@ async function request(method, path, body) {
 }
 
 export const api = {
-  register: (email, password, name) => request("POST", "/auth/register", { email, password, name }),
-  login: (email, password) => request("POST", "/auth/login", { email, password }),
+  register: (phone, password, name, email) => request("POST", "/auth/register", { phone, password, name, email }),
+  login: (phone, password) => request("POST", "/auth/login", { phone, password }),
   me: () => request("GET", "/auth/me"),
+  updateMe: (patch) => request("PATCH", "/auth/me", patch),
 
   listProjects: () => request("GET", "/projects"),
   createProject: (name, seed) => request("POST", "/projects", { name, seed }),
@@ -42,14 +43,18 @@ export const api = {
   renameProject: (id, name) => request("PATCH", `/projects/${id}`, { name }),
   deleteProject: (id) => request("DELETE", `/projects/${id}`),
 
-  addMember: (id, email, role) => request("POST", `/projects/${id}/members`, { email, role }),
+  addMember: (id, phone, role) => request("POST", `/projects/${id}/members`, { phone, role }),
   removeMember: (id, userId) => request("DELETE", `/projects/${id}/members/${userId}`),
 
   addStaff: (projectId, data) => request("POST", `/projects/${projectId}/staff`, data),
   updateStaff: (staffId, patch) => request("PATCH", `/projects/staff/${staffId}`, patch),
   deleteStaff: (staffId) => request("DELETE", `/projects/staff/${staffId}`),
+  getZaloCode: (staffId) => request("POST", `/projects/staff/${staffId}/zalo-code`),
+  unlinkZalo: (staffId) => request("DELETE", `/projects/staff/${staffId}/zalo-link`),
 
   getReport: (projectId, range) => request("GET", `/projects/${projectId}/report?range=${range}`),
+  getOverview: () => request("GET", "/reports/overview"),
+  getKPI: () => request("GET", "/reports/kpi"),
 
   addGroup: (projectId, phase, name) => request("POST", `/projects/${projectId}/groups`, { phase, name }),
   renameGroup: (groupId, name) => request("PATCH", `/projects/groups/${groupId}`, { name }),

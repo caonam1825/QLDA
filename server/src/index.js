@@ -5,6 +5,9 @@ const cors = require("cors");
 
 const authRoutes = require("./routes/auth");
 const projectRoutes = require("./routes/projects");
+const reportRoutes = require("./routes/reports");
+const zaloRoutes = require("./routes/zalo");
+const { startReminderScheduler } = require("./reminders");
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -14,6 +17,8 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
+app.use("/api/reports", reportRoutes);
+app.use("/api/zalo", zaloRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 
@@ -29,4 +34,5 @@ app.get("*", (req, res, next) => {
 
 app.listen(PORT, () => {
   console.log(`Server đang chạy tại http://localhost:${PORT}`);
+  startReminderScheduler();
 });

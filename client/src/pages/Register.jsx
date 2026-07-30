@@ -4,6 +4,7 @@ import { api, setToken } from "../api";
 
 export default function Register({ onAuthed, goLogin }) {
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -14,7 +15,7 @@ export default function Register({ onAuthed, goLogin }) {
     setError("");
     setLoading(true);
     try {
-      const { token, user } = await api.register(email.trim(), password, name.trim());
+      const { token, user } = await api.register(phone.trim(), password, name.trim(), email.trim());
       setToken(token);
       onAuthed(user);
     } catch (err) {
@@ -36,8 +37,12 @@ export default function Register({ onAuthed, goLogin }) {
           <input type="text" required value={name} onChange={e => setName(e.target.value)} autoFocus />
         </label>
         <label className="auth-field">
-          <span>Email</span>
-          <input type="email" required value={email} onChange={e => setEmail(e.target.value)} />
+          <span>Số điện thoại</span>
+          <input type="tel" placeholder="VD: 0912345678" required value={phone} onChange={e => setPhone(e.target.value)} />
+        </label>
+        <label className="auth-field">
+          <span>Email (không bắt buộc)</span>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} />
         </label>
         <label className="auth-field">
           <span>Mật khẩu (tối thiểu 6 ký tự)</span>

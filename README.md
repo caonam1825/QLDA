@@ -9,9 +9,9 @@ bằng → khởi công).
   cơ sở dữ liệu riêng).
 - **Frontend**: React (Vite), được build thành file tĩnh và phục vụ luôn bởi
   backend — chỉ cần chạy **một** tiến trình, **một** cổng.
-- **Đăng nhập**: email + mật khẩu, JWT. Mỗi dự án có chủ dự án (owner) và có
-  thể mời thêm thành viên khác (quyền Chỉnh sửa hoặc Chỉ xem) bằng email đã
-  đăng ký trên hệ thống.
+- **Đăng nhập**: số điện thoại + mật khẩu, JWT (email là tuỳ chọn, chỉ để hiển
+  thị). Mỗi dự án có chủ dự án (owner) và có thể mời thêm thành viên khác
+  (quyền Chỉnh sửa hoặc Chỉ xem) bằng số điện thoại đã đăng ký trên hệ thống.
 
 ---
 
@@ -105,11 +105,16 @@ và mount volume cho đường dẫn `DB_PATH`.
 ```
 server/            Backend Express + SQLite
   src/
-    db.js          Tạo bảng dữ liệu (users, projects, groups, tasks, members)
+    db.js          Tạo bảng dữ liệu (users, projects, groups, tasks, members, staff, reminder_log)
     auth.js        Băm mật khẩu, tạo/kiểm tra JWT
-    routes/auth.js       API đăng ký / đăng nhập / thông tin cá nhân
-    routes/projects.js   API dự án / nhóm bước / công việc / thành viên
-    templateData.js      Dữ liệu mẫu 98 bước từ hồ sơ gốc, dùng khi tạo dự án "Từ mẫu chuẩn"
+    phone.js        Chuẩn hoá & kiểm tra số điện thoại Việt Nam
+    zalo.js         Gọi API gửi tin nhắn Zalo OA
+    reminders.js     Bộ quét định kỳ tự nhắc việc trễ hạn/sắp đến hạn qua Zalo
+    routes/auth.js        API đăng ký / đăng nhập bằng SĐT / thông tin cá nhân
+    routes/projects.js    API dự án / nhóm bước / công việc / thành viên / nhân viên / liên kết Zalo
+    routes/reports.js     API tổng hợp nhiều dự án + xếp hạng KPI nhân viên
+    routes/zalo.js         Webhook nhận sự kiện từ Zalo OA
+    templateData.js      Dữ liệu mẫu trình tự thực hiện dự án, dùng khi tạo dự án "Từ mẫu chuẩn"
     index.js        Điểm khởi chạy server, phục vụ luôn frontend đã build
   public/           (sinh ra sau khi build client — không cần commit)
   data/             (sinh ra khi chạy — chứa app.db, không cần commit)
@@ -117,7 +122,8 @@ server/            Backend Express + SQLite
 client/             Frontend React (Vite)
   src/
     pages/          Login, Register, Dashboard
-    components/     TaskRow, GroupBlock/PhaseBlock, ProjectSwitcher, MembersPanel...
+    components/     TaskRow, GroupBlock/PhaseBlock, ProjectSwitcher, MembersPanel,
+                     StaffPanel (liên kết Zalo), ReportPanel, OverviewPanel (Tổng hợp & KPI)...
     api.js           Gọi API kèm token đăng nhập
     constants.js      Danh sách giai đoạn, trạng thái, hàm hỗ trợ
 
@@ -129,29 +135,110 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
 
 ## 6. Tính năng chính
 
-- **Nhiều dự án**: mỗi người/dự án tạo bao nhiêu dự án tuỳ ý — từ mẫu chuẩn 98
-  bước (Quy hoạch → Giai đoạn A: chủ trương đầu tư đến ký hợp đồng nhà đầu tư
-  → Giai đoạn B: ký hợp đồng đến khởi công) hoặc bắt đầu trống hoàn toàn.
+- **Nhiều dự án**: mỗi người/dự án tạo bao nhiêu dự án tuỳ ý — từ mẫu chuẩn
+  trình tự thực hiện dự án (Khảo sát → Chủ trương đầu tư → Đấu thầu lựa chọn
+  nhà đầu tư → Quy hoạch chi tiết 1/500 → Thu hồi đất, bồi thường GPMB →
+  BCNCKT/Thiết kế cơ sở → Thiết kế xây dựng → Giấy phép xây dựng → Thi công →
+  Nghiệm thu, bàn giao) hoặc bắt đầu trống hoàn toàn.
 - **Tuỳ chỉnh linh hoạt**: thêm/xoá/sửa/sắp xếp lại từng nhóm bước và từng đầu
   việc — tên công việc, đơn vị thực hiện, đơn vị phối hợp, thời gian dự kiến,
   căn cứ pháp lý, ghi chú.
+- **Danh sách nhân viên**: mỗi dự án có một danh bạ nhân viên riêng (tên, chức
+  vụ, phòng/đơn vị, email, điện thoại) — gán trực tiếp cho từng công việc thay
+  vì gõ tay tên mỗi lần, và dùng để tổng hợp báo cáo theo người.
 - **Giao việc & theo dõi**: trạng thái (chưa bắt đầu / đang thực hiện / hoàn
-  thành / tạm dừng), người phụ trách, hạn hoàn thành, cảnh báo trễ hạn, % hoàn
-  thành theo dự án / giai đoạn / nhóm.
+  thành / tạm dừng), người phụ trách (chọn từ danh sách nhân viên), hạn hoàn
+  thành, % hoàn thành theo dự án / giai đoạn / nhóm.
+- **Cảnh báo & báo cáo theo từng dự án**: nút "Báo cáo" hiển thị số việc trễ
+  hạn ngay trên header; bảng báo cáo Hôm nay / Tuần này liệt kê việc trễ hạn
+  cần nhắc nhở, việc sắp đến hạn, việc đã hoàn thành, và bảng tổng hợp theo
+  từng nhân viên.
+- **Tổng hợp toàn hệ thống & xếp hạng KPI** (nút "Tổng hợp & KPI" trên header):
+  gộp số liệu, việc trễ hạn/sắp đến hạn từ **tất cả** dự án bạn tham gia trong
+  một bảng duy nhất; đồng thời tự động tính điểm KPI và xếp hạng từng nhân
+  viên (hoàn thành đúng hạn, trễ hạn, đang vướng mắc, tỷ lệ hoàn thành) — một
+  người làm nhiều dự án được gộp điểm theo số điện thoại.
+- **Nhắc việc qua Zalo**: mỗi nhân viên có thể liên kết tài khoản Zalo cá nhân
+  (qua Official Account của công ty); hệ thống tự động quét mỗi 30 phút và
+  nhắn Zalo cho đúng người khi công việc của họ trễ hạn hoặc sắp đến hạn. Cần
+  tự cấu hình Zalo OA trước — xem mục 9.
+- **Gợi ý bước tiếp theo**: mỗi giai đoạn hiển thị sẵn công việc kế tiếp cần
+  làm (theo đúng thứ tự đã sắp xếp) kèm căn cứ pháp lý và ghi chú quy trình
+  của bước đó — không cần dò lại toàn bộ danh sách để biết "giờ phải làm gì".
 - **Nhiều người cùng dùng thật sự**: mỗi dự án có chủ dự án (owner) mời thêm
-  thành viên bằng email (quyền Chỉnh sửa hoặc Chỉ xem); dữ liệu lưu tập trung
-  trên server, ai cũng thấy cùng một dữ liệu khi tải lại trang.
+  thành viên bằng số điện thoại (quyền Chỉnh sửa hoặc Chỉ xem); dữ liệu lưu
+  tập trung trên server, ai cũng thấy cùng một dữ liệu khi tải lại trang.
 
-## 7. Giới hạn cần biết
+## 7. Cập nhật bản đang chạy (nếu đã triển khai trước đó)
+
+Các thay đổi này chỉ **thêm** bảng/cột dữ liệu mới, không xoá dữ liệu cũ — an
+toàn để cập nhật lên bản đang chạy:
+
+1. Ghi đè toàn bộ file trong repo GitHub của bạn bằng bộ mã nguồn mới này
+   (kéo-thả lại như lần đầu, hoặc `git push` nếu bạn dùng dòng lệnh).
+2. Nếu triển khai qua Render: repo cập nhật sẽ tự kích hoạt "Deploy" mới (hoặc
+   vào dashboard Render → bấm **Manual Deploy** → **Deploy latest commit**).
+3. Nếu chạy bằng Docker/VPS: chạy lại `docker compose up -d --build`.
+4. Không cần thao tác gì thêm với cơ sở dữ liệu — ứng dụng tự thêm bảng/cột
+   mới khi khởi động lần đầu sau khi cập nhật.
+
+**Lưu ý quan trọng về đổi sang đăng nhập bằng số điện thoại**: các tài khoản
+đã tạo trước đây (đăng nhập bằng email) sẽ được tự động gán một số điện thoại
+tạm là `cần-cập-nhật-<mã người dùng>` để không mất dữ liệu. Những người dùng
+này **cần được cấp lại/đổi số điện thoại thật** trước khi có thể đăng nhập lại
+bằng số điện thoại của họ — hiện tại việc này cần chỉnh trực tiếp trong cơ sở
+dữ liệu (bảng `users`, cột `phone`) vì đây là thay đổi lớn về định danh tài
+khoản. Nếu hệ thống của bạn còn ít người dùng, cách đơn giản nhất là mọi người
+đăng ký lại tài khoản mới bằng số điện thoại.
+
+## 8. Giới hạn cần biết
 
 - Ứng dụng **chưa** đồng bộ theo thời gian thực kiểu Google Docs (không dùng
   WebSocket) — mỗi người cần bấm "Tải lại" hoặc thao tác để lấy dữ liệu mới
   nhất người khác vừa cập nhật.
 - SQLite phù hợp cho một tổ chức/phòng ban dùng nội bộ (vài chục đến vài trăm
   người dùng đồng thời); nếu quy mô lớn hơn nhiều, nên chuyển sang PostgreSQL.
-- Nội dung "Căn cứ pháp lý" trong dữ liệu mẫu trích dẫn theo Luật Đất đai 2013,
-  Luật Đấu thầu 2013 và các nghị định cũ; nhiều văn bản đã được thay thế bởi
-  Luật Đất đai 2024, Luật Đấu thầu 2023, Luật Nhà ở 2023, Luật Kinh doanh Bất
-  động sản 2023 cùng các nghị định hướng dẫn mới. Hãy cập nhật lại nội dung
-  này (sửa trực tiếp trong app) hoặc tham vấn bộ phận pháp chế trước khi dùng
-  cho dự án thực tế.
+- Nội dung "Căn cứ pháp lý" trong dữ liệu mẫu đã cập nhật theo Luật Đầu tư
+  143/2025/QH15, Luật Đất đai 2024, Luật Xây dựng 135/2025/QH15, Luật Quy
+  hoạch đô thị và nông thôn 47/2024/QH15 cùng các nghị định hướng dẫn ban hành
+  2025–2026 (NĐ 96/2026, NĐ 217/2026, NĐ 178/2025, NĐ 102/2024, NĐ 49/2026…).
+  Đây vẫn là dữ liệu tổng hợp tham khảo ban đầu — vui lòng đối chiếu quy định
+  hiện hành hoặc tham vấn đơn vị pháp chế trước khi áp dụng cho dự án thực tế,
+  đặc biệt với các văn bản có hiệu lực theo mốc thời gian riêng (VD NĐ 96/2026
+  có hiệu lực từ 31/03/2026).
+- Điểm KPI là công thức mặc định đơn giản (xem `server/src/routes/reports.js`,
+  hàm `/kpi`) — sửa trực tiếp trong file đó nếu công ty muốn đổi trọng số hoặc
+  thêm tiêu chí khác (VD: mức độ khó của công việc, đánh giá định tính…).
+
+## 9. Cấu hình nhắc việc qua Zalo (không bắt buộc)
+
+Tính năng nhắc việc trễ hạn/sắp đến hạn qua Zalo cần bạn **tự chuẩn bị trước**
+những thứ sau (phần mềm không thể tự tạo thay):
+
+1. Một **Zalo Official Account (OA)** của công ty đã được xác thực — đăng ký
+   tại <https://oa.zalo.me>.
+2. Một ứng dụng trên <https://developers.zalo.me> liên kết với OA đó, được cấp
+   quyền gửi "Tin nhắn tư vấn" (OA Message CS).
+3. Lấy **access token** của OA qua luồng OAuth của Zalo, điền vào biến môi
+   trường `ZALO_OA_ACCESS_TOKEN` trong file `.env` (xem `.env.example`).
+   Access token của Zalo hết hạn định kỳ (thường ~25 giờ) — cần lấy lại và cập
+   nhật `.env` theo chu kỳ, hoặc nhờ bộ phận kỹ thuật dựng thêm luồng tự làm
+   mới token nếu dùng lâu dài.
+4. Khai báo **Webhook URL** là `https://<địa-chỉ-server-của-bạn>/api/zalo/webhook`
+   trong mục Webhook của ứng dụng Zalo, để hệ thống nhận được sự kiện khi nhân
+   viên nhắn mã liên kết cho OA.
+
+Sau khi cấu hình xong, cách liên kết cho từng nhân viên:
+
+1. Vào mục **Nhân viên** trong dự án, bấm biểu tượng Zalo bên cạnh tên nhân
+   viên để lấy **mã liên kết** 6 ký tự.
+2. Nhờ nhân viên đó mở Zalo, tìm Official Account của công ty và nhắn đúng mã
+   này cho OA.
+3. Hệ thống tự động khớp mã và lưu lại — từ đó nhân viên sẽ nhận được tin nhắc
+   việc qua Zalo khi công việc của họ trễ hạn hoặc sắp đến hạn (quét mỗi 30
+   phút).
+
+Lưu ý: theo chính sách của Zalo, OA chỉ được chủ động gửi tin trong vòng 48
+giờ kể từ lần người dùng tương tác gần nhất với OA — nếu nhân viên không nhắn
+tin lại với OA trong thời gian dài, tin nhắc việc có thể không gửi được cho
+đến khi họ tương tác lại.

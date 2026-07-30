@@ -1,9 +1,10 @@
 import { Circle, Clock3, CheckCircle2, PauseCircle } from "lucide-react";
 
 export const PHASES = [
-  { key: "QH", label: "Quy hoạch xây dựng", sub: "1/2000 · 1/500" },
-  { key: "A", label: "Giai đoạn A", sub: "Chủ trương đầu tư → Ký hợp đồng nhà đầu tư" },
-  { key: "B", label: "Giai đoạn B", sub: "Ký hợp đồng → Khởi công" },
+  { key: "CT", label: "Chủ trương đầu tư & Lựa chọn nhà đầu tư", sub: "Khảo sát địa điểm → CTCTĐT → Đấu thầu lựa chọn nhà đầu tư" },
+  { key: "QHDAT", label: "Quy hoạch & Đất đai", sub: "Quy hoạch chi tiết 1/500 → Thu hồi đất → Bồi thường, GPMB" },
+  { key: "XD", label: "Chuẩn bị đầu tư xây dựng", sub: "BCNCKT/TKCS → Thiết kế xây dựng → Giấy phép xây dựng" },
+  { key: "THICONG", label: "Thi công & Nghiệm thu, bàn giao", sub: "Triển khai thi công → Nghiệm thu → Bàn giao đưa vào sử dụng" },
 ];
 
 export const STATUS = {

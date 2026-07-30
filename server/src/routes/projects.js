@@ -3,6 +3,7 @@ const { nanoid } = require("nanoid");
 const db = require("../db");
 const { requireAuth } = require("../auth");
 const { DEFAULT_TASKS, DEFAULT_GROUPS } = require("../templateData");
+const { normalizePhone } = require("../phone");
 
 const router = express.Router();
 router.use(requireAuth);
@@ -74,6 +75,8 @@ function serializeStaff(s) {
   return {
     id: s.id, name: s.name, position: s.position, department: s.department,
     email: s.email, phone: s.phone,
+    zaloLinked: !!s.zalo_id,
+    zaloLinkCode: s.zalo_link_code || "",
   };
 }
 
@@ -99,7 +102,7 @@ function fullProject(projectId) {
     .map(serializeStaff);
   const members = db
     .prepare(
-      `SELECT u.id, u.name, u.email, pm.role FROM project_members pm
+      `SELECT u.id, u.name, u.email, u.phone, pm.role FROM project_members pm
        JOIN users u ON u.id = pm.user_id WHERE pm.project_id = ? ORDER BY pm.added_at ASC`
     )
     .all(projectId);
@@ -195,11 +198,11 @@ router.delete("/:id", (req, res) => {
 
 router.post("/:id/members", (req, res) => {
   if (!requireMember(req, res, req.params.id, { ownerOnly: true })) return;
-  const { email, role } = req.body || {};
-  if (!email) return res.status(400).json({ error: "Thiếu email" });
-  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(String(email).trim().toLowerCase());
+  const { phone, role } = req.body || {};
+  if (!phone) return res.status(400).json({ error: "Thiếu số điện thoại" });
+  const user = db.prepare("SELECT * FROM users WHERE phone = ?").get(normalizePhone(phone));
   if (!user) {
-    return res.status(404).json({ error: "Chưa có tài khoản nào đăng ký với email này. Người dùng cần đăng ký trước." });
+    return res.status(404).json({ error: "Chưa có tài khoản nào đăng ký với số điện thoại này. Người dùng cần đăng ký trước." });
   }
   const existing = getMembership(req.params.id, user.id);
   if (existing) return res.status(409).json({ error: "Người này đã là thành viên" });
@@ -388,6 +391,31 @@ router.delete("/staff/:staffId", (req, res) => {
     db.prepare("DELETE FROM staff WHERE id = ?").run(req.params.staffId);
   });
   tx();
+  res.json({ project: fullProject(projectId) });
+});
+
+/* ---------------- liên kết Zalo cho nhân viên (nhắc việc) ---------------- */
+
+// Sinh (hoặc lấy lại) mã liên kết 6 ký tự — nhân viên nhắn mã này cho Zalo OA
+// của công ty để hệ thống tự động khớp zalo_id với đúng nhân viên.
+router.post("/staff/:staffId/zalo-code", (req, res) => {
+  const projectId = projectIdOfStaff(req.params.staffId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
+  if (!requireMember(req, res, projectId, { blockViewer: true })) return;
+  const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(req.params.staffId);
+  let code = staff.zalo_link_code;
+  if (!code) {
+    code = Math.random().toString(36).slice(2, 8).toUpperCase();
+    db.prepare("UPDATE staff SET zalo_link_code = ? WHERE id = ?").run(code, req.params.staffId);
+  }
+  res.json({ code });
+});
+
+router.delete("/staff/:staffId/zalo-link", (req, res) => {
+  const projectId = projectIdOfStaff(req.params.staffId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
+  if (!requireMember(req, res, projectId, { blockViewer: true })) return;
+  db.prepare("UPDATE staff SET zalo_id = '', zalo_link_code = '' WHERE id = ?").run(req.params.staffId);
   res.json({ project: fullProject(projectId) });
 });
 
