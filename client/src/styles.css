@@ -271,3 +271,82 @@ body {
   .switcher-panel { width: 240px; }
   .app-header-right { align-items: flex-start; flex-direction: row-reverse; width: 100%; justify-content: space-between; }
 }
+
+/* ---------------- Header badge ---------------- */
+.header-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px;
+  background: var(--seal); color: #fff; font-size: 10px; font-weight: 700; border-radius: 9px; padding: 0 4px; margin-left: 4px;
+}
+
+/* ---------------- Assignee tag ---------------- */
+.tag-assignee { background: var(--gold-soft); color: var(--gold); }
+
+/* ---------------- Next steps widget ---------------- */
+.next-steps { margin-bottom: 18px; }
+.next-steps-head {
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--navy);
+  margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.next-steps-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.next-step-card {
+  background: var(--paper-raised); border: 1px solid var(--line); border-left: 4px solid var(--gold);
+  border-radius: 8px; padding: 12px 14px;
+}
+.next-step-phase {
+  font-family: 'IBM Plex Mono', monospace; font-size: 10.5px; letter-spacing: 0.06em; color: var(--gold);
+  text-transform: uppercase;
+}
+.next-step-title { font-size: 13.5px; font-weight: 600; color: var(--ink); margin-top: 4px; }
+.next-step-group { font-size: 11.5px; color: var(--slate); margin-top: 2px; }
+.next-step-legal {
+  display: flex; align-items: flex-start; gap: 5px; font-size: 11px; color: #5B2622; background: var(--seal-soft);
+  border-radius: 4px; padding: 5px 7px; margin-top: 6px;
+}
+.next-step-legal svg { flex-shrink: 0; margin-top: 1px; }
+.next-step-note { font-size: 11px; color: var(--slate); margin-top: 6px; font-style: italic; }
+.next-step-done { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--teal); margin-top: 6px; font-weight: 500; }
+
+/* ---------------- Staff panel ---------------- */
+.staff-row { align-items: flex-start; }
+.staff-form { border-top: 1px dashed var(--line); padding-top: 12px; margin-top: 4px; }
+.staff-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.staff-form-grid input {
+  border: 1px solid var(--line); border-radius: 5px; padding: 8px; font-size: 12.5px; grid-column: span 1;
+}
+.staff-form-grid input:first-child { grid-column: span 2; }
+.staff-form-actions { display: flex; gap: 8px; align-items: center; }
+.staff-form-actions button[type="submit"] {
+  display: flex; align-items: center; gap: 5px; background: var(--navy); color: #fff; border: none;
+  border-radius: 5px; padding: 8px 14px; font-size: 12.5px; cursor: pointer;
+}
+.staff-form-actions button[type="submit"]:disabled { opacity: 0.6; }
+.staff-cancel-edit { background: none; border: none; color: var(--slate); font-size: 12px; cursor: pointer; text-decoration: underline; }
+
+/* ---------------- Report panel ---------------- */
+.report-card { max-width: 560px; }
+.report-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.report-tab {
+  flex: 1; background: #EDEADD; border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 12.5px;
+  color: var(--slate); cursor: pointer;
+}
+.report-tab-active { background: var(--navy); color: #fff; border-color: var(--navy); }
+.report-body { display: flex; flex-direction: column; gap: 16px; }
+.report-section-title {
+  display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; color: var(--ink); margin: 0 0 8px;
+}
+.report-title-danger { color: var(--seal); }
+.report-title-warn { color: var(--gold); }
+.report-title-ok { color: var(--teal); }
+.report-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.report-item {
+  display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border-radius: 6px; background: #fff;
+  border: 1px solid var(--line); font-size: 12px;
+}
+.report-item-danger { border-left: 3px solid var(--seal); background: var(--seal-soft); }
+.report-item-warn { border-left: 3px solid var(--gold); background: var(--gold-soft); }
+.report-item-title { font-weight: 500; color: var(--ink); }
+.report-item-meta { font-size: 11px; color: var(--slate); }
+.report-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.report-table th, .report-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.report-table th { color: var(--slate); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; }
+.report-cell-danger { color: var(--seal); font-weight: 700; }

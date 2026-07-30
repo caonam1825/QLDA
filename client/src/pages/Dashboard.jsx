@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
-  FileText, X, Landmark, ClipboardList, Users, LogOut,
+  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS } from "../constants";
@@ -9,6 +9,9 @@ import { SealBadge, StatCard } from "../components/Basics";
 import { PhaseBlock } from "../components/GroupPhaseBlocks";
 import ProjectSwitcher from "../components/ProjectSwitcher";
 import MembersPanel from "../components/MembersPanel";
+import StaffPanel from "../components/StaffPanel";
+import ReportPanel from "../components/ReportPanel";
+import NextSteps from "../components/NextSteps";
 
 export default function Dashboard({ user, onLogout }) {
   const [projects, setProjects] = useState([]);
@@ -23,6 +26,8 @@ export default function Dashboard({ user, onLogout }) {
   const [unitFilter, setUnitFilter] = useState("ALL");
   const [noticeOpen, setNoticeOpen] = useState(true);
   const [membersOpen, setMembersOpen] = useState(false);
+  const [staffOpen, setStaffOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
 
   const loadProjectList = useCallback(async (preferId) => {
@@ -205,6 +210,13 @@ export default function Dashboard({ user, onLogout }) {
               <button className="members-btn" onClick={() => setMembersOpen(true)} type="button">
                 <Users size={14} /> Thành viên ({project.members.length})
               </button>
+              <button className="members-btn" onClick={() => setStaffOpen(true)} type="button">
+                <Users2 size={14} /> Nhân viên ({project.staff.length})
+              </button>
+              <button className="members-btn" onClick={() => setReportOpen(true)} type="button">
+                <BarChart3 size={14} /> Báo cáo
+                {stats.overdue > 0 && <span className="header-badge">{stats.overdue}</span>}
+              </button>
             </div>
             <p>
               Đấu thầu lựa chọn nhà đầu tư dự án có sử dụng đất — theo dõi &amp; giao việc cùng đồng nghiệp theo thời gian thực.
@@ -254,6 +266,8 @@ export default function Dashboard({ user, onLogout }) {
           <StatCard icon={AlertTriangle} label="Trễ hạn" value={stats.overdue} tint="#9E2B25" />
         </div>
 
+        <NextSteps project={project} />
+
         <div className="toolbar">
           <div className="search-box">
             <Search size={15} />
@@ -302,6 +316,7 @@ export default function Dashboard({ user, onLogout }) {
               key={g.phase.key}
               phase={g.phase}
               groups={g.groups}
+              staffList={project.staff}
               onProgressChange={handleProgressChange}
               onFieldChange={handleFieldChange}
               onDeleteTask={handleDeleteTask}
@@ -328,6 +343,19 @@ export default function Dashboard({ user, onLogout }) {
           onClose={() => setMembersOpen(false)}
           onChanged={() => refreshProject()}
         />
+      )}
+
+      {staffOpen && (
+        <StaffPanel
+          project={project}
+          readOnly={readOnly}
+          onClose={() => setStaffOpen(false)}
+          onChanged={() => refreshProject()}
+        />
+      )}
+
+      {reportOpen && (
+        <ReportPanel projectId={currentId} onClose={() => setReportOpen(false)} />
       )}
     </div>
   );

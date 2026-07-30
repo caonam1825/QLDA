@@ -1,13 +1,13 @@
 import { useState } from "react";
 import {
   ChevronDown, ChevronRight, Building2, CalendarDays, AlertTriangle,
-  ArrowUp, ArrowDown, Trash2,
+  ArrowUp, ArrowDown, Trash2, User,
 } from "lucide-react";
 import { STATUS, isOverdue } from "../constants";
 import { IconBtn, ConfirmButton } from "./Basics";
 
 export default function TaskRow({
-  task, code, onProgressChange, onFieldChange, onDelete, onMove,
+  task, code, staffList, onProgressChange, onFieldChange, onDelete, onMove,
   canMoveUp, canMoveDown, readOnly,
 }) {
   const [open, setOpen] = useState(false);
@@ -16,6 +16,11 @@ export default function TaskRow({
   const StIcon = st.icon;
   const overdue = isOverdue(entry.due, entry.status);
   const indent = task.level >= 4 ? 1 : 0;
+  const [customMode, setCustomMode] = useState(!!entry.assignee && !entry.assigneeStaffId);
+  const usingCustomName = customMode && !entry.assigneeStaffId;
+  const assigneeLabel = entry.assigneeStaffId
+    ? (staffList.find(s => s.id === entry.assigneeStaffId)?.name || "")
+    : entry.assignee;
 
   return (
     <div className="task-row" style={{ marginLeft: indent ? 22 : 0 }}>
@@ -28,6 +33,7 @@ export default function TaskRow({
         <span className="task-tags">
           {task.unitDo && <span className="tag tag-unit"><Building2 size={11} />{task.unitDo}</span>}
           {task.duration && <span className="tag tag-duration"><CalendarDays size={11} />{task.duration}</span>}
+          {assigneeLabel && <span className="tag tag-assignee"><User size={11} />{assigneeLabel}</span>}
         </span>
         <span className="task-status-pill" style={{ color: st.color, background: st.bg }}>
           <StIcon size={12} />{st.label}
@@ -91,12 +97,29 @@ export default function TaskRow({
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Người / đơn vị phụ trách</span>
-              <input
-                type="text" placeholder="VD: Nguyễn Văn A – P.QLDA" disabled={readOnly}
-                value={entry.assignee}
-                onChange={e => onProgressChange(task.id, { assignee: e.target.value })}
-              />
+              <span className="field-label">Người phụ trách</span>
+              <select
+                disabled={readOnly}
+                value={usingCustomName ? "__custom__" : (entry.assigneeStaffId || "")}
+                onChange={e => {
+                  const v = e.target.value;
+                  if (v === "__custom__") { setCustomMode(true); onProgressChange(task.id, { assigneeStaffId: "" }); }
+                  else { setCustomMode(false); onProgressChange(task.id, { assigneeStaffId: v, assignee: "" }); }
+                }}
+              >
+                <option value="">— Chưa gán —</option>
+                {staffList.map(s => <option key={s.id} value={s.id}>{s.name}{s.position ? ` (${s.position})` : ""}</option>)}
+                <option value="__custom__">Khác (nhập tay)…</option>
+              </select>
+              {usingCustomName && (
+                <input
+                  type="text" disabled={readOnly}
+                  placeholder="Nhập tên người phụ trách…"
+                  value={entry.assignee}
+                  onChange={e => onProgressChange(task.id, { assignee: e.target.value })}
+                  style={{ marginTop: 4 }}
+                />
+              )}
             </label>
             <label className="field">
               <span className="field-label">Hạn hoàn thành</span>

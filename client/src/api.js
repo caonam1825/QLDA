@@ -45,6 +45,12 @@ export const api = {
   addMember: (id, email, role) => request("POST", `/projects/${id}/members`, { email, role }),
   removeMember: (id, userId) => request("DELETE", `/projects/${id}/members/${userId}`),
 
+  addStaff: (projectId, data) => request("POST", `/projects/${projectId}/staff`, data),
+  updateStaff: (staffId, patch) => request("PATCH", `/projects/staff/${staffId}`, patch),
+  deleteStaff: (staffId) => request("DELETE", `/projects/staff/${staffId}`),
+
+  getReport: (projectId, range) => request("GET", `/projects/${projectId}/report?range=${range}`),
+
   addGroup: (projectId, phase, name) => request("POST", `/projects/${projectId}/groups`, { phase, name }),
   renameGroup: (groupId, name) => request("PATCH", `/projects/groups/${groupId}`, { name }),
   deleteGroup: (groupId) => request("DELETE", `/projects/groups/${groupId}`),

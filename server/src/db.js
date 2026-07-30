@@ -64,10 +64,29 @@ CREATE TABLE IF NOT EXISTS tasks (
   updated_at INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS staff (
+  id TEXT PRIMARY KEY,
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  position TEXT NOT NULL DEFAULT '',
+  department TEXT NOT NULL DEFAULT '',
+  email TEXT NOT NULL DEFAULT '',
+  phone TEXT NOT NULL DEFAULT '',
+  created_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_groups_project ON groups_(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_group ON tasks(group_id);
 CREATE INDEX IF NOT EXISTS idx_members_user ON project_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_staff_project ON staff(project_id);
 `);
+
+// Safe migration for databases created before the "staff" feature existed:
+// add the assignee_staff_id column to tasks if it isn't there yet.
+const taskCols = db.prepare("PRAGMA table_info(tasks)").all().map((c) => c.name);
+if (!taskCols.includes("assignee_staff_id")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN assignee_staff_id TEXT NOT NULL DEFAULT ''");
+}
 
 module.exports = db;

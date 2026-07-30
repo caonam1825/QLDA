@@ -62,10 +62,24 @@ function serializeTask(t) {
     progress: {
       status: t.status,
       assignee: t.assignee,
+      assigneeStaffId: t.assignee_staff_id || "",
       due: t.due_date,
       note: t.progress_note,
     },
+    updatedAt: t.updated_at || null,
   };
+}
+
+function serializeStaff(s) {
+  return {
+    id: s.id, name: s.name, position: s.position, department: s.department,
+    email: s.email, phone: s.phone,
+  };
+}
+
+function projectIdOfStaff(staffId) {
+  const row = db.prepare("SELECT project_id FROM staff WHERE id = ?").get(staffId);
+  return row ? row.project_id : null;
 }
 
 function fullProject(projectId) {
@@ -79,6 +93,10 @@ function fullProject(projectId) {
     .prepare("SELECT * FROM tasks WHERE project_id = ? ORDER BY sort_order ASC")
     .all(projectId)
     .map(serializeTask);
+  const staff = db
+    .prepare("SELECT * FROM staff WHERE project_id = ? ORDER BY created_at ASC")
+    .all(projectId)
+    .map(serializeStaff);
   const members = db
     .prepare(
       `SELECT u.id, u.name, u.email, pm.role FROM project_members pm
@@ -93,6 +111,7 @@ function fullProject(projectId) {
     groups,
     tasks,
     members,
+    staff,
   };
 }
 
@@ -280,11 +299,12 @@ router.patch("/tasks/:taskId/progress", (req, res) => {
   const projectId = projectIdOfTask(req.params.taskId);
   if (!projectId) return res.status(404).json({ error: "Không tìm thấy công việc" });
   if (!requireMember(req, res, projectId, { blockViewer: true })) return;
-  const { status, assignee, due, note } = req.body || {};
+  const { status, assignee, assigneeStaffId, due, note } = req.body || {};
   const sets = [];
   const vals = [];
   if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
   if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
+  if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
   if (due !== undefined) { sets.push("due_date = ?"); vals.push(due); }
   if (note !== undefined) { sets.push("progress_note = ?"); vals.push(note); }
   sets.push("updated_by = ?"); vals.push(req.user.id);
@@ -323,6 +343,125 @@ router.delete("/tasks/:taskId", (req, res) => {
   if (!requireMember(req, res, projectId, { blockViewer: true })) return;
   db.prepare("DELETE FROM tasks WHERE id = ?").run(req.params.taskId);
   res.json({ project: fullProject(projectId) });
+});
+
+/* ---------------- staff directory (nhân viên) ---------------- */
+
+router.post("/:id/staff", (req, res) => {
+  if (!requireMember(req, res, req.params.id, { blockViewer: true })) return;
+  const { name, position, department, email, phone } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Thiếu tên nhân viên" });
+  const sid = nanoid();
+  db.prepare(
+    `INSERT INTO staff (id, project_id, name, position, department, email, phone, created_at)
+     VALUES (?,?,?,?,?,?,?,?)`
+  ).run(sid, req.params.id, name.trim(), position || "", department || "", email || "", phone || "", Date.now());
+  res.json({ project: fullProject(req.params.id) });
+});
+
+router.patch("/staff/:staffId", (req, res) => {
+  const projectId = projectIdOfStaff(req.params.staffId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
+  if (!requireMember(req, res, projectId, { blockViewer: true })) return;
+  const allowed = ["name", "position", "department", "email", "phone"];
+  const sets = [];
+  const vals = [];
+  for (const key of allowed) {
+    if (Object.prototype.hasOwnProperty.call(req.body || {}, key)) {
+      sets.push(`${key} = ?`);
+      vals.push(req.body[key]);
+    }
+  }
+  if (sets.length) {
+    vals.push(req.params.staffId);
+    db.prepare(`UPDATE staff SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+  }
+  res.json({ project: fullProject(projectId) });
+});
+
+router.delete("/staff/:staffId", (req, res) => {
+  const projectId = projectIdOfStaff(req.params.staffId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
+  if (!requireMember(req, res, projectId, { blockViewer: true })) return;
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE assignee_staff_id = ?").run(req.params.staffId);
+    db.prepare("DELETE FROM staff WHERE id = ?").run(req.params.staffId);
+  });
+  tx();
+  res.json({ project: fullProject(projectId) });
+});
+
+/* ---------------- báo cáo ngày / tuần ---------------- */
+
+router.get("/:id/report", (req, res) => {
+  if (!requireMember(req, res, req.params.id)) return;
+  const range = req.query.range === "week" ? "week" : "day";
+
+  const now = new Date();
+  let rangeStart;
+  if (range === "day") {
+    rangeStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  } else {
+    const day = now.getDay(); // 0 = Sunday
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + mondayOffset);
+    rangeStart = monday.getTime();
+  }
+
+  const todayStr = new Date().toISOString().slice(0, 10);
+
+  const allTasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(req.params.id);
+  const staffList = db.prepare("SELECT * FROM staff WHERE project_id = ?").all(req.params.id);
+  const staffById = new Map(staffList.map(s => [s.id, s]));
+
+  function labelFor(t) {
+    if (t.assignee_staff_id && staffById.has(t.assignee_staff_id)) return staffById.get(t.assignee_staff_id).name;
+    if (t.assignee) return t.assignee;
+    return "Chưa gán";
+  }
+
+  const updatedInRange = allTasks
+    .filter(t => t.updated_at && t.updated_at >= rangeStart)
+    .sort((a, b) => b.updated_at - a.updated_at)
+    .map(t => ({
+      id: t.id, title: t.title, status: t.status, assignee: labelFor(t),
+      updatedAt: t.updated_at, phase: t.phase,
+    }));
+
+  const doneInRange = updatedInRange.filter(t => t.status === "done");
+
+  const overdueList = allTasks
+    .filter(t => t.due_date && t.status !== "done" && t.due_date < todayStr)
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : 1))
+    .map(t => ({ id: t.id, title: t.title, due: t.due_date, assignee: labelFor(t), phase: t.phase }));
+
+  const dueSoonList = allTasks
+    .filter(t => t.due_date && t.status !== "done" && t.due_date >= todayStr &&
+      t.due_date <= new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10))
+    .sort((a, b) => (a.due_date < b.due_date ? -1 : 1))
+    .map(t => ({ id: t.id, title: t.title, due: t.due_date, assignee: labelFor(t), phase: t.phase }));
+
+  const byStaffMap = new Map();
+  function bucket(name) {
+    if (!byStaffMap.has(name)) byStaffMap.set(name, { name, done: 0, doing: 0, todo: 0, blocked: 0, overdue: 0 });
+    return byStaffMap.get(name);
+  }
+  for (const t of allTasks) {
+    const name = labelFor(t);
+    const b = bucket(name);
+    b[t.status] = (b[t.status] || 0) + 1;
+    if (t.due_date && t.status !== "done" && t.due_date < todayStr) b.overdue++;
+  }
+
+  res.json({
+    range,
+    rangeStart,
+    updatedTasks: updatedInRange,
+    doneCount: doneInRange.length,
+    overdueList,
+    dueSoonList,
+    byStaff: Array.from(byStaffMap.values()).sort((a, b) => b.done - a.done),
+  });
 });
 
 module.exports = router;

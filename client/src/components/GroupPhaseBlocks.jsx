@@ -5,7 +5,7 @@ import { MiniBar, IconBtn, ConfirmButton } from "./Basics";
 import TaskRow from "./TaskRow";
 
 export function GroupBlock({
-  group, roman, tasks,
+  group, roman, tasks, staffList,
   onProgressChange, onFieldChange, onDeleteTask, onMoveTask,
   onRenameGroup, onDeleteGroup, onAddTask, defaultOpen, readOnly,
 }) {
@@ -50,6 +50,7 @@ export function GroupBlock({
             <TaskRow
               key={t.id}
               task={t}
+              staffList={staffList}
               code={`${roman}.${i + 1}`}
               onProgressChange={onProgressChange}
               onFieldChange={onFieldChange}
@@ -72,7 +73,7 @@ export function GroupBlock({
 }
 
 export function PhaseBlock({
-  phase, groups, onProgressChange, onFieldChange, onDeleteTask,
+  phase, groups, staffList, onProgressChange, onFieldChange, onDeleteTask,
   onMoveTask, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase, readOnly,
 }) {
   const allTasks = groups.flatMap(g => g.tasks);
@@ -98,6 +99,7 @@ export function PhaseBlock({
             group={g}
             roman={toRoman(i + 1)}
             tasks={g.tasks}
+            staffList={staffList}
             onProgressChange={onProgressChange}
             onFieldChange={onFieldChange}
             onDeleteTask={onDeleteTask}
