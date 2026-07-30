@@ -14,6 +14,17 @@ export const STATUS = {
   blocked: { label: "Tạm dừng / Vướng mắc", color: "#9E2B25", bg: "#F5E4E2", icon: PauseCircle },
 };
 
+export const ROLE_OPTIONS = [
+  { key: "viewer", label: "Chỉ xem" },
+  { key: "name_editor", label: "Chỉ sửa tên đầu việc" },
+  { key: "process_editor", label: "Chỉ thêm quy trình" },
+  { key: "editor", label: "Chỉnh sửa toàn quyền" },
+];
+
+export function roleLabel(key) {
+  return ROLE_OPTIONS.find(r => r.key === key)?.label || (key === "owner" ? "Chủ dự án" : key);
+}
+
 const ROMAN_TABLE = [
   [50, "L"], [40, "XL"], [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
 ];

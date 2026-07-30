@@ -166,8 +166,25 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   làm (theo đúng thứ tự đã sắp xếp) kèm căn cứ pháp lý và ghi chú quy trình
   của bước đó — không cần dò lại toàn bộ danh sách để biết "giờ phải làm gì".
 - **Nhiều người cùng dùng thật sự**: mỗi dự án có chủ dự án (owner) mời thêm
-  thành viên bằng số điện thoại (quyền Chỉnh sửa hoặc Chỉ xem); dữ liệu lưu
-  tập trung trên server, ai cũng thấy cùng một dữ liệu khi tải lại trang.
+  thành viên bằng số điện thoại; dữ liệu lưu tập trung trên server, ai cũng
+  thấy cùng một dữ liệu khi tải lại trang.
+- **Xem tiến độ dự án khác**: bất kỳ ai đã đăng nhập cũng xem được (chế độ chỉ
+  xem) tiến độ của MỌI dự án trong hệ thống, kể cả dự án mình không phải
+  thành viên chính thức — chỉ chỉnh sửa mới cần đúng quyền.
+- **Phân quyền chi tiết theo từng thành viên/nhân viên** (không chỉ 2 mức
+  "chỉnh sửa / chỉ xem" như trước): Chủ dự án, Chỉnh sửa toàn quyền, Chỉ thêm
+  quy trình (thêm/xoá/sắp xếp nhóm bước — không sửa nội dung hay tiến độ), Chỉ
+  sửa tên đầu việc (chỉ sửa tên/nội dung công việc có sẵn — không thêm/xoá,
+  không cập nhật tiến độ), và Chỉ xem. Đổi quyền trong mục "Thành viên".
+- **Thêm nhân viên không cần tự đăng ký**: mục "Nhân viên" cho phép thêm người
+  vào danh bạ để gán việc mà không cần họ có tài khoản; nếu muốn họ tự đăng
+  nhập xem/cập nhật việc của mình, admin có thể **cấp thẳng tài khoản** (số
+  điện thoại + mật khẩu + vai trò) ngay khi thêm nhân viên, không cần qua màn
+  hình đăng ký.
+- **Khoá hạn hoàn thành làm căn cứ KPI**: mỗi đầu việc có thể được chủ dự án
+  khoá hạn hoàn thành lại — sau khi khoá, không ai (kể cả chủ dự án qua thao
+  tác thường) sửa được hạn nữa cho đến khi mở khoá lại, đảm bảo dữ liệu KPI
+  không bị chỉnh sửa giữa chừng.
 
 ## 7. Cập nhật bản đang chạy (nếu đã triển khai trước đó)
 

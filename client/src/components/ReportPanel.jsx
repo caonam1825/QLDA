@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, X, AlertTriangle, Clock3, CheckCircle2 } from "lucide-react";
+import { BarChart3, X, AlertTriangle, Clock3, CheckCircle2, Loader2, Lock } from "lucide-react";
 import { api } from "../api";
 import { PHASES } from "../constants";
 
@@ -11,6 +11,22 @@ function formatTime(ms) {
   if (!ms) return "";
   const d = new Date(ms);
   return d.toLocaleString("vi-VN", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+function TaskList({ items, tone }) {
+  return (
+    <ul className="report-list">
+      {items.map(t => (
+        <li key={t.id} className={`report-item ${tone ? `report-item-${tone}` : ""}`}>
+          <span className="report-item-title">{t.title}</span>
+          <span className="report-item-meta">
+            {phaseLabel(t.phase)} · <b>Người phụ trách:</b> {t.assignee}
+            {t.due && <> · <b>Hạn:</b> {t.due}{t.dueLocked && <Lock size={10} style={{ verticalAlign: -1, marginLeft: 2 }} />}</>}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function ReportPanel({ projectId, onClose }) {
@@ -38,11 +54,11 @@ export default function ReportPanel({ projectId, onClose }) {
         </div>
 
         <div className="report-tabs">
-          <button className={`report-tab ${range === "day" ? "report-tab-active" : ""}`} onClick={() => setRange("day")} type="button">Hôm nay</button>
-          <button className={`report-tab ${range === "week" ? "report-tab-active" : ""}`} onClick={() => setRange("week")} type="button">Tuần này</button>
+          <button className={`report-tab ${range === "day" ? "report-tab-active" : ""}`} onClick={() => setRange("day")} type="button">Báo cáo ngày</button>
+          <button className={`report-tab ${range === "week" ? "report-tab-active" : ""}`} onClick={() => setRange("week")} type="button">Báo cáo tuần</button>
         </div>
 
-        {loading && <p className="invite-hint">Đang tải…</p>}
+        {loading && <p className="invite-hint"><Loader2 size={13} className="spin" /> Đang tải…</p>}
         {error && <div className="auth-error">{error}</div>}
 
         {data && !loading && (
@@ -50,43 +66,42 @@ export default function ReportPanel({ projectId, onClose }) {
             {data.overdueList.length > 0 && (
               <section className="report-section">
                 <h4 className="report-section-title report-title-danger"><AlertTriangle size={14} /> Trễ hạn — cần nhắc nhở ({data.overdueList.length})</h4>
-                <ul className="report-list">
-                  {data.overdueList.map(t => (
-                    <li key={t.id} className="report-item report-item-danger">
-                      <span className="report-item-title">{t.title || "(chưa đặt tên)"}</span>
-                      <span className="report-item-meta">{phaseLabel(t.phase)} · {t.assignee} · hạn {t.due}</span>
-                    </li>
-                  ))}
-                </ul>
+                <TaskList items={data.overdueList} tone="danger" />
               </section>
             )}
 
-            {data.dueSoonList.length > 0 && (
-              <section className="report-section">
-                <h4 className="report-section-title report-title-warn"><Clock3 size={14} /> Sắp đến hạn (trong 2 ngày tới)</h4>
-                <ul className="report-list">
-                  {data.dueSoonList.map(t => (
-                    <li key={t.id} className="report-item report-item-warn">
-                      <span className="report-item-title">{t.title || "(chưa đặt tên)"}</span>
-                      <span className="report-item-meta">{phaseLabel(t.phase)} · {t.assignee} · hạn {t.due}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <section className="report-section">
+              <h4 className="report-section-title report-title-warn"><Clock3 size={14} /> Đang thực hiện ({data.inProgressList.length})</h4>
+              {data.inProgressList.length === 0 ? (
+                <p className="invite-hint">Không có công việc nào đang thực hiện.</p>
+              ) : (
+                <TaskList items={data.inProgressList} tone="warn" />
+              )}
+            </section>
+
+            <section className="report-section">
+              <h4 className="report-section-title">
+                Dự kiến thực hiện ({range === "day" ? "2 ngày tới" : "7 ngày tới"}) ({data.upcomingList.length})
+              </h4>
+              {data.upcomingList.length === 0 ? (
+                <p className="invite-hint">Không có việc nào sắp đến hạn trong khoảng thời gian này.</p>
+              ) : (
+                <TaskList items={data.upcomingList} />
+              )}
+            </section>
 
             <section className="report-section">
               <h4 className="report-section-title report-title-ok">
                 <CheckCircle2 size={14} /> Đã hoàn thành {range === "day" ? "hôm nay" : "trong tuần"} ({data.doneCount})
               </h4>
-              {data.updatedTasks.filter(t => t.status === "done").length === 0 ? (
+              {data.doneList.length === 0 ? (
                 <p className="invite-hint">Chưa có công việc nào hoàn thành trong khoảng thời gian này.</p>
               ) : (
                 <ul className="report-list">
-                  {data.updatedTasks.filter(t => t.status === "done").map(t => (
+                  {data.doneList.map(t => (
                     <li key={t.id} className="report-item">
-                      <span className="report-item-title">{t.title || "(chưa đặt tên)"}</span>
-                      <span className="report-item-meta">{phaseLabel(t.phase)} · {t.assignee} · {formatTime(t.updatedAt)}</span>
+                      <span className="report-item-title">{t.title}</span>
+                      <span className="report-item-meta">{phaseLabel(t.phase)} · <b>Người phụ trách:</b> {t.assignee} · {formatTime(t.updatedAt)}</span>
                     </li>
                   ))}
                 </ul>

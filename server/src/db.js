@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS projects (
 CREATE TABLE IF NOT EXISTS project_members (
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role TEXT NOT NULL DEFAULT 'editor', -- 'owner' | 'editor' | 'viewer'
+  role TEXT NOT NULL DEFAULT 'editor', -- 'owner' | 'editor' | 'process_editor' | 'name_editor' | 'viewer'
   added_at INTEGER NOT NULL,
   PRIMARY KEY (project_id, user_id)
 );
@@ -62,7 +62,10 @@ CREATE TABLE IF NOT EXISTS tasks (
   due_date TEXT NOT NULL DEFAULT '',
   progress_note TEXT NOT NULL DEFAULT '',
   updated_by TEXT,
-  updated_at INTEGER
+  updated_at INTEGER,
+  due_locked INTEGER NOT NULL DEFAULT 0,
+  due_locked_by TEXT NOT NULL DEFAULT '',
+  due_locked_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS staff (
@@ -75,6 +78,7 @@ CREATE TABLE IF NOT EXISTS staff (
   phone TEXT NOT NULL DEFAULT '',
   zalo_id TEXT NOT NULL DEFAULT '',
   zalo_link_code TEXT NOT NULL DEFAULT '',
+  linked_user_id TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
 );
 
@@ -111,6 +115,16 @@ if (!staffCols.includes("zalo_id")) {
 }
 if (!staffCols.includes("zalo_link_code")) {
   db.exec("ALTER TABLE staff ADD COLUMN zalo_link_code TEXT NOT NULL DEFAULT ''");
+}
+if (!staffCols.includes("linked_user_id")) {
+  db.exec("ALTER TABLE staff ADD COLUMN linked_user_id TEXT NOT NULL DEFAULT ''");
+}
+
+// Safe migration for databases created before due-date locking existed.
+if (!taskCols.includes("due_locked")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN due_locked INTEGER NOT NULL DEFAULT 0");
+  db.exec("ALTER TABLE tasks ADD COLUMN due_locked_by TEXT NOT NULL DEFAULT ''");
+  db.exec("ALTER TABLE tasks ADD COLUMN due_locked_at INTEGER");
 }
 
 // Migration: databases created before phone-number login existed had

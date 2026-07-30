@@ -44,6 +44,7 @@ export const api = {
   deleteProject: (id) => request("DELETE", `/projects/${id}`),
 
   addMember: (id, phone, role) => request("POST", `/projects/${id}/members`, { phone, role }),
+  updateMemberRole: (id, userId, role) => request("PATCH", `/projects/${id}/members/${userId}`, { role }),
   removeMember: (id, userId) => request("DELETE", `/projects/${id}/members/${userId}`),
 
   addStaff: (projectId, data) => request("POST", `/projects/${projectId}/staff`, data),
@@ -51,6 +52,9 @@ export const api = {
   deleteStaff: (staffId) => request("DELETE", `/projects/staff/${staffId}`),
   getZaloCode: (staffId) => request("POST", `/projects/staff/${staffId}/zalo-code`),
   unlinkZalo: (staffId) => request("DELETE", `/projects/staff/${staffId}/zalo-link`),
+
+  lockTaskDue: (taskId) => request("POST", `/projects/tasks/${taskId}/lock-due`),
+  unlockTaskDue: (taskId) => request("POST", `/projects/tasks/${taskId}/unlock-due`),
 
   getReport: (projectId, range) => request("GET", `/projects/${projectId}/report?range=${range}`),
   getOverview: () => request("GET", "/reports/overview"),

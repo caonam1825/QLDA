@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { Users2, X, Plus, Trash2, Pencil, MessageCircle, Link2Off } from "lucide-react";
+import { Users2, X, Plus, Trash2, Pencil, MessageCircle, Link2Off, KeyRound } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
+import { ROLE_OPTIONS } from "../constants";
 
 const emptyForm = { name: "", position: "", department: "", email: "", phone: "" };
+const emptyLogin = { grantLogin: false, loginPhone: "", loginPassword: "", role: "viewer" };
 
-export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
+export default function StaffPanel({ project, canManage, onClose, onChanged }) {
   const [form, setForm] = useState(emptyForm);
+  const [login, setLogin] = useState(emptyLogin);
   const [editingId, setEditingId] = useState(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -40,9 +43,17 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
       if (editingId) {
         await api.updateStaff(editingId, form);
       } else {
-        await api.addStaff(project.id, form);
+        const payload = { ...form };
+        if (login.grantLogin) {
+          payload.grantLogin = true;
+          payload.loginPhone = login.loginPhone || form.phone;
+          payload.loginPassword = login.loginPassword;
+          payload.role = login.role;
+        }
+        await api.addStaff(project.id, payload);
       }
       setForm(emptyForm);
+      setLogin(emptyLogin);
       setEditingId(null);
       onChanged();
     } catch (err) {
@@ -55,6 +66,7 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
   function startEdit(s) {
     setEditingId(s.id);
     setForm({ name: s.name, position: s.position, department: s.department, email: s.email, phone: s.phone });
+    setLogin(emptyLogin);
   }
 
   async function handleDelete(id) {
@@ -75,6 +87,11 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
           <button className="modal-close" onClick={onClose} type="button"><X size={16} /></button>
         </div>
 
+        <p className="invite-hint">
+          Thêm nhân viên vào danh bạ để gán việc — <b>không cần họ tự đăng ký</b>. Nếu muốn nhân viên tự đăng
+          nhập xem/cập nhật việc của mình, tick "Cấp tài khoản đăng nhập" khi thêm mới và chọn quyền phù hợp.
+        </p>
+
         <div className="members-list">
           {project.staff.length === 0 && (
             <p className="invite-hint">Chưa có nhân viên nào. Thêm để có thể gán công việc và xem báo cáo theo từng người.</p>
@@ -89,10 +106,13 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
                     {s.email ? ` · ${s.email}` : ""}
                   </span>
                 </div>
+                {s.hasLogin && (
+                  <span className="zalo-status zalo-status-on"><KeyRound size={12} /> Có tài khoản đăng nhập</span>
+                )}
                 <span className={`zalo-status ${s.zaloLinked ? "zalo-status-on" : "zalo-status-off"}`}>
                   <MessageCircle size={12} /> {s.zaloLinked ? "Đã liên kết Zalo" : "Chưa liên kết Zalo"}
                 </span>
-                {!readOnly && (
+                {canManage && (
                   <>
                     {s.zaloLinked ? (
                       <button className="icon-btn" title="Huỷ liên kết Zalo" onClick={() => handleUnlinkZalo(s.id)} type="button"><Link2Off size={13} /></button>
@@ -115,7 +135,7 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
           ))}
         </div>
 
-        {!readOnly && (
+        {canManage && (
           <form className="staff-form" onSubmit={handleSubmit}>
             <div className="staff-form-grid">
               <input type="text" placeholder="Họ và tên *" required
@@ -129,10 +149,32 @@ export default function StaffPanel({ project, readOnly, onClose, onChanged }) {
               <input type="text" placeholder="Số điện thoại"
                 value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
             </div>
+
+            {!editingId && (
+              <div className="staff-login-box">
+                <label className="staff-login-toggle">
+                  <input type="checkbox" checked={login.grantLogin}
+                    onChange={e => setLogin(l => ({ ...l, grantLogin: e.target.checked }))} />
+                  <span>Cấp tài khoản đăng nhập cho nhân viên này (không cần họ tự đăng ký)</span>
+                </label>
+                {login.grantLogin && (
+                  <div className="staff-form-grid">
+                    <input type="tel" placeholder="SĐT đăng nhập (mặc định lấy SĐT ở trên)"
+                      value={login.loginPhone} onChange={e => setLogin(l => ({ ...l, loginPhone: e.target.value }))} />
+                    <input type="text" placeholder="Mật khẩu (tối thiểu 6 ký tự) *" required={login.grantLogin}
+                      value={login.loginPassword} onChange={e => setLogin(l => ({ ...l, loginPassword: e.target.value }))} />
+                    <select value={login.role} onChange={e => setLogin(l => ({ ...l, role: e.target.value }))}>
+                      {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="staff-form-actions">
               <button type="submit" disabled={busy}><Plus size={14} /> {editingId ? "Lưu thay đổi" : "Thêm nhân viên"}</button>
               {editingId && (
-                <button type="button" className="staff-cancel-edit" onClick={() => { setEditingId(null); setForm(emptyForm); }}>
+                <button type="button" className="staff-cancel-edit" onClick={() => { setEditingId(null); setForm(emptyForm); setLogin(emptyLogin); }}>
                   Huỷ sửa
                 </button>
               )}

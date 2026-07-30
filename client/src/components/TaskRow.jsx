@@ -1,14 +1,14 @@
 import { useState } from "react";
 import {
   ChevronDown, ChevronRight, Building2, CalendarDays, AlertTriangle,
-  ArrowUp, ArrowDown, Trash2, User,
+  ArrowUp, ArrowDown, Trash2, User, Lock, Unlock,
 } from "lucide-react";
 import { STATUS, isOverdue } from "../constants";
 import { IconBtn, ConfirmButton } from "./Basics";
 
 export default function TaskRow({
   task, code, staffList, onProgressChange, onFieldChange, onDelete, onMove,
-  canMoveUp, canMoveDown, readOnly,
+  onLockDue, onUnlockDue, canMoveUp, canMoveDown, perms,
 }) {
   const [open, setOpen] = useState(false);
   const entry = task.progress;
@@ -22,6 +22,13 @@ export default function TaskRow({
     ? (staffList.find(s => s.id === entry.assigneeStaffId)?.name || "")
     : entry.assignee;
 
+  const canEditFields = !!perms?.editTaskFields;
+  const canEditProgress = !!perms?.editProgress;
+  const canManage = !!perms?.addProcess; // thêm/xoá/sắp xếp lại
+  const canLock = !!perms?.manageLock;
+  const dueLocked = !!entry.dueLocked;
+  const dueDisabled = !canEditProgress || dueLocked;
+
   return (
     <div className="task-row" style={{ marginLeft: indent ? 22 : 0 }}>
       <div className="task-row-head">
@@ -34,12 +41,13 @@ export default function TaskRow({
           {task.unitDo && <span className="tag tag-unit"><Building2 size={11} />{task.unitDo}</span>}
           {task.duration && <span className="tag tag-duration"><CalendarDays size={11} />{task.duration}</span>}
           {assigneeLabel && <span className="tag tag-assignee"><User size={11} />{assigneeLabel}</span>}
+          {dueLocked && <span className="tag tag-locked"><Lock size={11} />Đã khoá hạn</span>}
         </span>
         <span className="task-status-pill" style={{ color: st.color, background: st.bg }}>
           <StIcon size={12} />{st.label}
         </span>
         {overdue && <span className="tag tag-overdue"><AlertTriangle size={11} />Trễ hạn</span>}
-        {!readOnly && (
+        {canManage && (
           <span className="task-row-actions">
             <IconBtn icon={ArrowUp} title="Chuyển lên" onClick={() => onMove(task.id, -1)} disabled={!canMoveUp} />
             <IconBtn icon={ArrowDown} title="Chuyển xuống" onClick={() => onMove(task.id, 1)} disabled={!canMoveDown} />
@@ -53,7 +61,7 @@ export default function TaskRow({
           <div className="field field-full">
             <span className="field-label">Tên công việc / đầu mục</span>
             <input
-              type="text" value={task.title} disabled={readOnly}
+              type="text" value={task.title} disabled={!canEditFields}
               placeholder="Nhập tên bước công việc…"
               onChange={e => onFieldChange(task.id, { title: e.target.value })}
             />
@@ -63,7 +71,7 @@ export default function TaskRow({
             <label className="field">
               <span className="field-label">Đơn vị thực hiện</span>
               <input
-                type="text" placeholder="VD: Sở Kế hoạch và Đầu tư" disabled={readOnly}
+                type="text" placeholder="VD: Sở Kế hoạch và Đầu tư" disabled={!canEditFields}
                 value={task.unitDo}
                 onChange={e => onFieldChange(task.id, { unitDo: e.target.value })}
               />
@@ -71,7 +79,7 @@ export default function TaskRow({
             <label className="field">
               <span className="field-label">Đơn vị phối hợp / trình</span>
               <input
-                type="text" placeholder="VD: Các sở, ngành liên quan" disabled={readOnly}
+                type="text" placeholder="VD: Các sở, ngành liên quan" disabled={!canEditFields}
                 value={task.unitCoord}
                 onChange={e => onFieldChange(task.id, { unitCoord: e.target.value })}
               />
@@ -79,7 +87,7 @@ export default function TaskRow({
             <label className="field">
               <span className="field-label">Thời gian dự kiến</span>
               <input
-                type="text" placeholder="VD: 10 ngày" disabled={readOnly}
+                type="text" placeholder="VD: 10 ngày" disabled={!canEditFields}
                 value={task.duration}
                 onChange={e => onFieldChange(task.id, { duration: e.target.value })}
               />
@@ -90,7 +98,7 @@ export default function TaskRow({
             <label className="field">
               <span className="field-label">Trạng thái</span>
               <select
-                value={entry.status} disabled={readOnly}
+                value={entry.status} disabled={!canEditProgress}
                 onChange={e => onProgressChange(task.id, { status: e.target.value })}
               >
                 {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -99,7 +107,7 @@ export default function TaskRow({
             <label className="field">
               <span className="field-label">Người phụ trách</span>
               <select
-                disabled={readOnly}
+                disabled={!canEditProgress}
                 value={usingCustomName ? "__custom__" : (entry.assigneeStaffId || "")}
                 onChange={e => {
                   const v = e.target.value;
@@ -113,7 +121,7 @@ export default function TaskRow({
               </select>
               {usingCustomName && (
                 <input
-                  type="text" disabled={readOnly}
+                  type="text" disabled={!canEditProgress}
                   placeholder="Nhập tên người phụ trách…"
                   value={entry.assignee}
                   onChange={e => onProgressChange(task.id, { assignee: e.target.value })}
@@ -122,11 +130,25 @@ export default function TaskRow({
               )}
             </label>
             <label className="field">
-              <span className="field-label">Hạn hoàn thành</span>
+              <span className="field-label">
+                Hạn hoàn thành
+                {canLock && (
+                  dueLocked ? (
+                    <button type="button" className="due-lock-btn" title="Mở khoá hạn" onClick={() => onUnlockDue(task.id)}>
+                      <Unlock size={11} /> Mở khoá
+                    </button>
+                  ) : (
+                    <button type="button" className="due-lock-btn" title="Khoá hạn làm căn cứ KPI" onClick={() => onLockDue(task.id)}>
+                      <Lock size={11} /> Khoá hạn
+                    </button>
+                  )
+                )}
+              </span>
               <input
-                type="date" disabled={readOnly}
+                type="date" disabled={dueDisabled}
                 value={entry.due}
                 onChange={e => onProgressChange(task.id, { due: e.target.value })}
+                title={dueLocked ? "Hạn đã bị khoá làm căn cứ tính KPI — chỉ chủ dự án mở khoá được" : undefined}
               />
             </label>
           </div>
@@ -134,7 +156,7 @@ export default function TaskRow({
           <label className="field field-full">
             <span className="field-label">Căn cứ pháp lý</span>
             <input
-              type="text" placeholder="VD: Điều 31 Nghị định số 31/2021/NĐ-CP" disabled={readOnly}
+              type="text" placeholder="VD: Điều 31 Nghị định số 31/2021/NĐ-CP" disabled={!canEditFields}
               value={task.legal}
               onChange={e => onFieldChange(task.id, { legal: e.target.value })}
             />
@@ -143,7 +165,7 @@ export default function TaskRow({
           <label className="field field-full">
             <span className="field-label">Ghi chú quy trình</span>
             <textarea
-              rows={2} disabled={readOnly}
+              rows={2} disabled={!canEditFields}
               placeholder="VD: mốc thời gian rút gọn, điều kiện áp dụng…"
               value={task.origNote}
               onChange={e => onFieldChange(task.id, { origNote: e.target.value })}
@@ -153,7 +175,7 @@ export default function TaskRow({
           <label className="field field-full field-note">
             <span className="field-label">Ghi chú thực tế / cập nhật tiến độ</span>
             <textarea
-              rows={2} disabled={readOnly}
+              rows={2} disabled={!canEditProgress}
               placeholder="Ghi chú riêng cho công việc này…"
               value={entry.note}
               onChange={e => onProgressChange(task.id, { note: e.target.value })}

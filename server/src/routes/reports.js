@@ -5,17 +5,17 @@ const { requireAuth } = require("../auth");
 const router = express.Router();
 router.use(requireAuth);
 
-function myProjectIds(userId) {
-  return db
-    .prepare("SELECT project_id FROM project_members WHERE user_id = ?")
-    .all(userId)
-    .map(r => r.project_id);
+// Từ khi mọi người dùng đã đăng nhập đều xem được mọi dự án trong hệ thống,
+// báo cáo tổng hợp & KPI cũng tính trên TOÀN BỘ dự án (không chỉ dự án mình
+// là thành viên chính thức) để phản ánh đúng bức tranh toàn công ty.
+function allProjectIds() {
+  return db.prepare("SELECT id FROM projects").all().map(r => r.id);
 }
 
 /* ---------------- Tổng hợp nhiều dự án ---------------- */
 
 router.get("/overview", (req, res) => {
-  const projectIds = myProjectIds(req.user.id);
+  const projectIds = allProjectIds();
   if (projectIds.length === 0) {
     return res.json({ projects: [], overdueList: [], dueSoonList: [], totals: { total: 0, done: 0, overdue: 0 } });
   }
@@ -83,7 +83,7 @@ router.get("/overview", (req, res) => {
 // dự án vẫn được tính KPI gộp chung; nếu không có số điện thoại thì gộp theo
 // tên + đơn vị.
 router.get("/kpi", (req, res) => {
-  const projectIds = myProjectIds(req.user.id);
+  const projectIds = allProjectIds();
   if (projectIds.length === 0) return res.json({ ranking: [] });
   const placeholders = projectIds.map(() => "?").join(",");
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds);

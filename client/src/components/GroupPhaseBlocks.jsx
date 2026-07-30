@@ -5,14 +5,16 @@ import { MiniBar, IconBtn, ConfirmButton } from "./Basics";
 import TaskRow from "./TaskRow";
 
 export function GroupBlock({
-  group, roman, tasks, staffList,
+  group, roman, tasks, staffList, perms,
   onProgressChange, onFieldChange, onDeleteTask, onMoveTask,
-  onRenameGroup, onDeleteGroup, onAddTask, defaultOpen, readOnly,
+  onLockDue, onUnlockDue,
+  onRenameGroup, onDeleteGroup, onAddTask, defaultOpen,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(group.name || "");
   const done = tasks.filter(t => t.progress.status === "done").length;
+  const canManage = !!perms?.addProcess;
 
   return (
     <div className="group-block">
@@ -37,7 +39,7 @@ export function GroupBlock({
           <span className="group-name" onClick={() => setOpen(o => !o)}>{group.name || "(Nhóm chưa đặt tên)"}</span>
         )}
         <MiniBar done={done} total={tasks.length} />
-        {!readOnly && (
+        {canManage && (
           <span className="group-actions">
             <IconBtn icon={Pencil} title="Đổi tên nhóm" onClick={() => setEditingName(true)} />
             <ConfirmButton icon={Trash2} title="Xoá cả nhóm" confirmLabel="Xoá nhóm?" danger onConfirm={() => onDeleteGroup(group.id)} />
@@ -56,12 +58,14 @@ export function GroupBlock({
               onFieldChange={onFieldChange}
               onDelete={onDeleteTask}
               onMove={onMoveTask}
+              onLockDue={onLockDue}
+              onUnlockDue={onUnlockDue}
               canMoveUp={i > 0}
               canMoveDown={i < tasks.length - 1}
-              readOnly={readOnly}
+              perms={perms}
             />
           ))}
-          {!readOnly && (
+          {canManage && (
             <button className="add-task-btn" onClick={() => onAddTask(group.id)} type="button">
               <Plus size={13} /> Thêm bước trong nhóm này
             </button>
@@ -73,11 +77,12 @@ export function GroupBlock({
 }
 
 export function PhaseBlock({
-  phase, groups, staffList, onProgressChange, onFieldChange, onDeleteTask,
-  onMoveTask, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase, readOnly,
+  phase, groups, staffList, perms, onProgressChange, onFieldChange, onDeleteTask,
+  onMoveTask, onLockDue, onUnlockDue, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase,
 }) {
   const allTasks = groups.flatMap(g => g.tasks);
   const done = allTasks.filter(t => t.progress.status === "done").length;
+  const canManage = !!perms?.addProcess;
 
   return (
     <section className="phase-block">
@@ -100,18 +105,20 @@ export function PhaseBlock({
             roman={toRoman(i + 1)}
             tasks={g.tasks}
             staffList={staffList}
+            perms={perms}
             onProgressChange={onProgressChange}
             onFieldChange={onFieldChange}
             onDeleteTask={onDeleteTask}
             onMoveTask={onMoveTask}
+            onLockDue={onLockDue}
+            onUnlockDue={onUnlockDue}
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
             onAddTask={onAddTask}
             defaultOpen={firstPhase && i === 0}
-            readOnly={readOnly}
           />
         ))}
-        {!readOnly && (
+        {canManage && (
           <button className="add-group-btn" onClick={() => onAddGroup(phase.key)} type="button">
             <FolderPlus size={14} /> Thêm nhóm bước mới trong {phase.label}
           </button>

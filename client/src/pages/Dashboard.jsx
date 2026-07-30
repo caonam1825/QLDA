@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
-  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid,
+  FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS } from "../constants";
@@ -13,6 +13,8 @@ import StaffPanel from "../components/StaffPanel";
 import ReportPanel from "../components/ReportPanel";
 import OverviewPanel from "../components/OverviewPanel";
 import NextSteps from "../components/NextSteps";
+
+const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
 
 export default function Dashboard({ user, onLogout }) {
   const [projects, setProjects] = useState([]);
@@ -37,7 +39,7 @@ export default function Dashboard({ user, onLogout }) {
     setProjects(list);
     if (list.length === 0) {
       const { project: proj } = await api.createProject("Dự án 1", "template");
-      setProjects([{ id: proj.id, name: proj.name, role: "owner" }]);
+      setProjects([{ id: proj.id, name: proj.name, role: "owner", isMember: true }]);
       setCurrentId(proj.id);
       setProject(proj);
       return;
@@ -55,12 +57,11 @@ export default function Dashboard({ user, onLogout }) {
       .finally(() => setLoading(false));
   }, [loadProjectList]);
 
-  const role = useMemo(() => {
-    const p = projects.find(pr => pr.id === currentId);
-    return p ? p.role : "editor";
-  }, [projects, currentId]);
-  const isOwner = role === "owner";
-  const readOnly = role === "viewer";
+  const listEntry = useMemo(() => projects.find(pr => pr.id === currentId), [projects, currentId]);
+  const isOwner = (project?.myRole || listEntry?.role) === "owner";
+  const isMember = listEntry ? listEntry.isMember : true;
+  const perms = project?.myPerms || NO_PERMS;
+  const hasAnyEdit = perms.editTaskFields || perms.editProgress || perms.addProcess;
 
   async function refreshProject(id = currentId) {
     const { project: proj } = await api.getProject(id);
@@ -120,6 +121,10 @@ export default function Dashboard({ user, onLogout }) {
     withSave(async () => { await api.renameGroup(groupId, name); await refreshProject(); });
   const handleDeleteGroup = (groupId) =>
     withSave(async () => { await api.deleteGroup(groupId); await refreshProject(); });
+  const handleLockDue = (taskId) =>
+    withSave(async () => { await api.lockTaskDue(taskId); await refreshProject(); });
+  const handleUnlockDue = (taskId) =>
+    withSave(async () => { await api.unlockTaskDue(taskId); await refreshProject(); });
 
   const units = useMemo(() => {
     if (!project) return [];
@@ -225,7 +230,8 @@ export default function Dashboard({ user, onLogout }) {
             </div>
             <p>
               Đấu thầu lựa chọn nhà đầu tư dự án có sử dụng đất — theo dõi &amp; giao việc cùng đồng nghiệp theo thời gian thực.
-              {readOnly && <b> Bạn đang xem ở chế độ chỉ xem.</b>}
+              {!isMember && <b> <Eye size={12} style={{ verticalAlign: -1 }} /> Bạn đang xem dự án này ở chế độ chỉ xem (chưa phải thành viên chính thức).</b>}
+              {isMember && !hasAnyEdit && <b> Bạn đang xem ở chế độ chỉ xem.</b>}
             </p>
           </div>
           <div className="app-header-right">
@@ -321,16 +327,18 @@ export default function Dashboard({ user, onLogout }) {
               phase={g.phase}
               groups={g.groups}
               staffList={project.staff}
+              perms={perms}
               onProgressChange={handleProgressChange}
               onFieldChange={handleFieldChange}
               onDeleteTask={handleDeleteTask}
               onMoveTask={handleMoveTask}
+              onLockDue={handleLockDue}
+              onUnlockDue={handleUnlockDue}
               onRenameGroup={handleRenameGroup}
               onDeleteGroup={handleDeleteGroup}
               onAddTask={handleAddTask}
               onAddGroup={handleAddGroup}
               firstPhase={i === 0}
-              readOnly={readOnly}
             />
           ))
         )}
@@ -343,7 +351,7 @@ export default function Dashboard({ user, onLogout }) {
       {membersOpen && (
         <MembersPanel
           project={project}
-          isOwner={isOwner}
+          canManage={perms.manageMembers}
           onClose={() => setMembersOpen(false)}
           onChanged={() => refreshProject()}
         />
@@ -352,7 +360,7 @@ export default function Dashboard({ user, onLogout }) {
       {staffOpen && (
         <StaffPanel
           project={project}
-          readOnly={readOnly}
+          canManage={perms.manageStaff}
           onClose={() => setStaffOpen(false)}
           onChanged={() => refreshProject()}
         />
