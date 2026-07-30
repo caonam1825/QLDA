@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
   FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
-  MessageSquare, ListChecks,
+  MessageSquare, ListChecks, ArrowLeft,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS, isOverdue } from "../constants";
@@ -20,7 +20,7 @@ import NextSteps from "../components/NextSteps";
 
 const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
 
-export default function Dashboard({ user, onLogout }) {
+export default function Dashboard({ user, onLogout, initialProjectId, onBackHome }) {
   const [projects, setProjects] = useState([]);
   const [currentId, setCurrentId] = useState(null);
   const [project, setProject] = useState(null);
@@ -41,6 +41,7 @@ export default function Dashboard({ user, onLogout }) {
   const [chatOpen, setChatOpen] = useState(false);
   const [myTasksOpen, setMyTasksOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
+  const [exportingDetail, setExportingDetail] = useState(false);
 
   const loadProjectList = useCallback(async (preferId) => {
     const { projects: list } = await api.listProjects();
@@ -52,11 +53,12 @@ export default function Dashboard({ user, onLogout }) {
       setProject(proj);
       return;
     }
-    const pickId = preferId && list.some(p => p.id === preferId) ? preferId : list[0].id;
+    const wanted = preferId || initialProjectId;
+    const pickId = wanted && list.some(p => p.id === wanted) ? wanted : list[0].id;
     setCurrentId(pickId);
     const { project: proj } = await api.getProject(pickId);
     setProject(proj);
-  }, []);
+  }, [initialProjectId]);
 
   useEffect(() => {
     setLoading(true);
@@ -133,6 +135,17 @@ export default function Dashboard({ user, onLogout }) {
     withSave(async () => { await api.lockTaskDue(taskId); await refreshProject(); });
   const handleUnlockDue = (taskId) =>
     withSave(async () => { await api.unlockTaskDue(taskId); await refreshProject(); });
+
+  async function handleExportDetail() {
+    setExportingDetail(true);
+    try {
+      await api.exportProjectDetail(currentId);
+    } catch (e) {
+      setError(e.message || "Không xuất được báo cáo chi tiết");
+    } finally {
+      setExportingDetail(false);
+    }
+  }
 
   const units = useMemo(() => {
     if (!project) return [];
@@ -218,6 +231,9 @@ export default function Dashboard({ user, onLogout }) {
   return (
     <div className="app-root">
       <div className="app-topbar">
+        <button className="topbar-btn topbar-btn-home" onClick={onBackHome} type="button">
+          <ArrowLeft size={14} /> Trang chủ (tất cả dự án)
+        </button>
         <button className="topbar-btn topbar-btn-primary" onClick={() => setMyTasksOpen(true)} type="button">
           <ListChecks size={14} /> Việc của tôi
         </button>
@@ -238,7 +254,7 @@ export default function Dashboard({ user, onLogout }) {
                 onCreate={handleCreateProject}
                 onRename={handleRenameProject}
                 onDelete={handleDeleteProject}
-                onShowAll={() => setOverviewOpen(true)}
+                onShowAll={onBackHome}
               />
               <button className="members-btn" onClick={() => setMembersOpen(true)} type="button">
                 <Users size={14} /> Thành viên ({project.members.length})
@@ -369,6 +385,9 @@ export default function Dashboard({ user, onLogout }) {
             <span className={`save-indicator save-${saveState}`}>
               {saveState === "saving" ? "Đang lưu…" : saveState === "saved" ? "Đã lưu" : ""}
             </span>
+            <button className="export-btn" onClick={handleExportDetail} disabled={exportingDetail} type="button">
+              <FileText size={13} /> {exportingDetail ? "Đang xuất…" : "Xuất chi tiết (Word) — cơ sở họp"}
+            </button>
             <button className="reset-btn" onClick={() => refreshProject()} type="button">
               <RefreshCw size={13} /> Tải lại
             </button>

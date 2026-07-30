@@ -237,7 +237,64 @@ async function buildOverviewDocx(overview, kpi) {
   return Packer.toBuffer(doc);
 }
 
+/* ===================== Báo cáo CHI TIẾT toàn bộ công việc (làm cơ sở họp) ===================== */
+
+const STATUS_LABEL_VI = {
+  todo: "Chưa bắt đầu", doing: "Đang thực hiện", done: "Hoàn thành", blocked: "Tạm dừng/Vướng mắc",
+};
+
+function detailTable(headers, rows) {
+  const widths = [6, 24, 13, 13, 10, 16, 10, 12, 8, 15]; // % cột, đủ cho tối đa 10 cột
+  const mkCell = (text, bold, colIdx) => new TableCell({
+    children: [new Paragraph({ children: [new TextRun({ text: String(text ?? ""), bold: !!bold, size: 18 })] })],
+    width: { size: widths[colIdx] || Math.floor(100 / headers.length), type: WidthType.PERCENTAGE },
+  });
+  const headerRow = new TableRow({ children: headers.map((h, i) => mkCell(h, true, i)) });
+  const bodyRows = rows.map((row) => new TableRow({ children: row.map((c, i) => mkCell(c, false, i)) }));
+  return new Table({ rows: [headerRow, ...bodyRows], width: { size: 100, type: WidthType.PERCENTAGE } });
+}
+
+// groups: [{id, name, phaseLabel}], tasks: đã kèm sẵn assigneeName (string)
+async function buildDetailedProjectDocx(projectName, groups, tasks) {
+  const byGroup = new Map();
+  tasks.forEach((t) => {
+    if (!byGroup.has(t.group)) byGroup.set(t.group, []);
+    byGroup.get(t.group).push(t);
+  });
+
+  const children = [
+    new Paragraph({ text: "BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC", heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
+    new Paragraph({
+      text: `BÁO CÁO CHI TIẾT CÔNG VIỆC — ${projectName}`,
+      heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER,
+    }),
+    new Paragraph({ text: `(Tài liệu phục vụ họp giao ban — xuất lúc ${todayVN()})`, alignment: AlignmentType.CENTER }),
+  ];
+
+  let stt = 1;
+  for (const g of groups) {
+    const groupTasks = byGroup.get(g.id) || [];
+    if (groupTasks.length === 0) continue;
+    children.push(docxHeading(`${g.phaseLabel ? `[${g.phaseLabel}] ` : ""}${g.name}`, HeadingLevel.HEADING_2));
+    children.push(
+      detailTable(
+        ["STT", "Tên công việc", "Đơn vị thực hiện", "Đơn vị phối hợp", "Thời gian dự kiến", "Căn cứ pháp lý", "Trạng thái", "Người phụ trách", "Hạn", "Ghi chú"],
+        groupTasks.map((t) => [
+          stt++, t.title || "(chưa đặt tên)", t.unitDo || "", t.unitCoord || "", t.duration || "",
+          t.legal || "", STATUS_LABEL_VI[t.status] || t.status, t.assigneeName || "Chưa gán",
+          t.due ? `${t.due}${t.dueLocked ? " (đã khoá)" : ""}` : "", t.note || "",
+        ])
+      )
+    );
+    children.push(new Paragraph({ text: "" }));
+  }
+
+  const doc = new Document({ sections: [{ children }] });
+  return Packer.toBuffer(doc);
+}
+
 module.exports = {
   buildProjectReportPdf, buildProjectReportDocx,
   buildOverviewPdf, buildOverviewDocx,
+  buildDetailedProjectDocx,
 };

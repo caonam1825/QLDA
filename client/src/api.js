@@ -48,8 +48,11 @@ export const api = {
   removeMember: (id, userId) => request("DELETE", `/projects/${id}/members/${userId}`),
 
   addStaff: (projectId, data) => request("POST", `/projects/${projectId}/staff`, data),
+  getStaffDirectory: () => request("GET", "/projects/staff-directory"),
+  setStaffSelection: (projectId, staffIds) => request("PUT", `/projects/${projectId}/staff-selection`, { staffIds }),
+  untickStaff: (projectId, staffId) => request("DELETE", `/projects/${projectId}/staff/${staffId}`),
+  deleteStaffPermanently: (staffId) => request("DELETE", `/projects/staff-directory/${staffId}`),
   updateStaff: (staffId, patch) => request("PATCH", `/projects/staff/${staffId}`, patch),
-  deleteStaff: (staffId) => request("DELETE", `/projects/staff/${staffId}`),
   getZaloCode: (staffId) => request("POST", `/projects/staff/${staffId}/zalo-code`),
   unlinkZalo: (staffId) => request("DELETE", `/projects/staff/${staffId}/zalo-link`),
 
@@ -90,6 +93,8 @@ export const api = {
   },
   exportProjectReport: (projectId, range, format) =>
     api.downloadFile(`/projects/${projectId}/report/export?range=${range}&format=${format}`, `bao-cao-${range === "week" ? "tuan" : "ngay"}.${format}`),
+  exportProjectDetail: (projectId) =>
+    api.downloadFile(`/projects/${projectId}/export-detail`, "chi-tiet-cong-viec.docx"),
   exportOverview: (format) =>
     api.downloadFile(`/reports/overview/export?format=${format}`, `tong-hop-kpi.${format}`),
 

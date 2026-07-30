@@ -69,6 +69,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   due_locked_at INTEGER
 );
 
+-- Danh bạ "nhân viên/Ban quản lý dự án" giờ dùng CHUNG cho toàn công ty —
+-- staff.project_id chỉ còn ý nghĩa lịch sử (dự án tạo ra hồ sơ này lần đầu).
+-- Việc 1 nhân viên có thuộc 1 dự án cụ thể hay không được quyết định bằng
+-- bảng project_staff (tích chọn) bên dưới, để không phải nhập lại SĐT mỗi khi
+-- thêm người vào dự án mới — chỉ cần tích chọn từ danh bạ đã có sẵn.
 CREATE TABLE IF NOT EXISTS staff (
   id TEXT PRIMARY KEY,
   project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
@@ -81,6 +86,14 @@ CREATE TABLE IF NOT EXISTS staff (
   zalo_link_code TEXT NOT NULL DEFAULT '',
   linked_user_id TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL
+);
+
+-- Tích chọn: nhân viên nào (staff.id) thuộc dự án nào (project_id).
+CREATE TABLE IF NOT EXISTS project_staff (
+  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  staff_id TEXT NOT NULL REFERENCES staff(id) ON DELETE CASCADE,
+  added_at INTEGER NOT NULL,
+  PRIMARY KEY (project_id, staff_id)
 );
 
 -- Ghi lại các lần đã gửi nhắc việc qua Zalo, để không gửi trùng trong 1 ngày
@@ -113,6 +126,8 @@ CREATE INDEX IF NOT EXISTS idx_members_user ON project_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_staff_project ON staff(project_id);
 CREATE INDEX IF NOT EXISTS idx_staff_phone ON staff(phone);
 CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room, created_at);
+CREATE INDEX IF NOT EXISTS idx_project_staff_project ON project_staff(project_id);
+CREATE INDEX IF NOT EXISTS idx_project_staff_staff ON project_staff(staff_id);
 `);
 
 // Safe migration for databases created before the "staff" feature existed:
@@ -176,6 +191,28 @@ if (!userColsNow.includes("is_super_admin")) {
   // thống luôn có ít nhất 1 người có quyền cao nhất sau khi nâng cấp.
   const first = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get();
   if (first) db.prepare("UPDATE users SET is_super_admin = 1 WHERE id = ?").run(first.id);
+}
+
+// Migration: databases created before "Ban quản lý dự án dùng chung" existed
+// — mỗi nhân viên đã có sẵn chỉ gắn với đúng 1 dự án (project_id). Tự động
+// tích chọn (project_staff) họ vào đúng dự án gốc đó để không mất phân công
+// đã có, đồng thời từ nay có thể tích chọn thêm vào dự án khác mà không cần
+// tạo lại hồ sơ / nhập lại số điện thoại.
+const staffNeedingProjectStaff = db
+  .prepare(
+    `SELECT s.id, s.project_id FROM staff s
+     LEFT JOIN project_staff ps ON ps.staff_id = s.id AND ps.project_id = s.project_id
+     WHERE ps.staff_id IS NULL`
+  )
+  .all();
+if (staffNeedingProjectStaff.length > 0) {
+  const insertPS = db.prepare(
+    "INSERT OR IGNORE INTO project_staff (project_id, staff_id, added_at) VALUES (?,?,?)"
+  );
+  const tx = db.transaction((rows) => {
+    for (const r of rows) insertPS.run(r.project_id, r.id, Date.now());
+  });
+  tx(staffNeedingProjectStaff);
 }
 
 module.exports = db;

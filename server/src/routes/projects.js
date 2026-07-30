@@ -121,7 +121,11 @@ function fullProject(projectId, viewerRole) {
     .all(projectId)
     .map(serializeTask);
   const staff = db
-    .prepare("SELECT * FROM staff WHERE project_id = ? ORDER BY created_at ASC")
+    .prepare(
+      `SELECT s.* FROM project_staff ps
+       JOIN staff s ON s.id = ps.staff_id
+       WHERE ps.project_id = ? ORDER BY ps.added_at ASC`
+    )
     .all(projectId)
     .map(serializeStaff);
   const members = db
@@ -205,6 +209,25 @@ router.post("/", (req, res) => {
   });
   insert();
   res.json({ project: fullProject(projectId, "owner") });
+});
+
+// Danh bạ nhân viên TOÀN CÔNG TY ("Ban quản lý dự án") — thêm 1 lần, dùng
+// tích chọn (checkbox) cho mọi dự án, không cần nhập lại số điện thoại mỗi
+// lần. Đặt route này TRƯỚC "GET /:id" để tránh Express hiểu nhầm
+// "staff-directory" là :id.
+router.get("/staff-directory", (req, res) => {
+  const rows = db.prepare("SELECT * FROM staff ORDER BY created_at ASC").all().map(serializeStaff);
+  // Kèm luôn danh sách project_id mà mỗi người đang được tích chọn, để giao
+  // diện tô sẵn checkbox mà không cần gọi thêm API.
+  const psRows = db.prepare("SELECT staff_id, project_id FROM project_staff").all();
+  const projectIdsByStaff = new Map();
+  for (const r of psRows) {
+    if (!projectIdsByStaff.has(r.staff_id)) projectIdsByStaff.set(r.staff_id, []);
+    projectIdsByStaff.get(r.staff_id).push(r.project_id);
+  }
+  res.json({
+    staff: rows.map(s => ({ ...s, projectIds: projectIdsByStaff.get(s.id) || [] })),
+  });
 });
 
 router.get("/:id", (req, res) => {
@@ -446,15 +469,17 @@ router.delete("/tasks/:taskId", (req, res) => {
   res.json({ project: fullProject(projectId, access.role) });
 });
 
-/* ---------------- staff directory (nhân viên) ---------------- */
+/* ---------------- staff directory (nhân viên / Ban quản lý dự án) ---------------- */
 
-// Thêm nhân viên — KHÔNG cần nhân viên tự đăng ký. Có 3 chế độ:
-//  1) Chỉ thêm vào danh bạ (mặc định) — dùng để gán công việc, không đăng nhập được.
-//  2) grantLogin=true — admin cấp TÀI KHOẢN MỚI (SĐT + mật khẩu do admin đặt),
-//     thêm thẳng vào dự án với vai trò chỉ định, không qua màn hình "Đăng ký".
-//  3) linkExistingPhone — nhân viên ĐÃ CÓ tài khoản (tự đăng ký từ trước hoặc
-//     được cấp ở dự án khác) — chỉ cần nhập đúng SĐT đã đăng ký để liên kết,
-//     không cần đặt lại mật khẩu.
+// Thêm MỘT nhân viên HOÀN TOÀN MỚI (người chưa từng có hồ sơ trong hệ thống)
+// — tạo hồ sơ 1 lần rồi tự động tích chọn luôn vào dự án đang mở. Với người
+// ĐÃ CÓ hồ sơ sẵn ở dự án khác, dùng PUT ":id/staff-selection" để tích chọn
+// thay vì gọi lại API này (tránh tạo trùng hồ sơ).
+//
+// Vẫn hỗ trợ cấp/liên kết tài khoản đăng nhập ngay lúc tạo:
+//  1) Chỉ thêm vào danh bạ (mặc định) — không đăng nhập được.
+//  2) grantLogin=true — admin cấp TÀI KHOẢN MỚI (SĐT + mật khẩu do admin đặt).
+//  3) linkExistingPhone — liên kết với tài khoản đã đăng ký sẵn bằng SĐT.
 router.post("/:id/staff", (req, res) => {
   const access = requireProjectAccess(req, res, req.params.id, "manageStaff");
   if (!access) return;
@@ -508,11 +533,78 @@ router.post("/:id/staff", (req, res) => {
   }
 
   const sid = nanoid();
-  db.prepare(
-    `INSERT INTO staff (id, project_id, name, position, department, email, phone, linked_user_id, created_at)
-     VALUES (?,?,?,?,?,?,?,?,?)`
-  ).run(sid, req.params.id, name.trim(), position || "", department || "", email || "", phone || "", linkedUserId, Date.now());
+  const tx = db.transaction(() => {
+    db.prepare(
+      `INSERT INTO staff (id, project_id, name, position, department, email, phone, linked_user_id, created_at)
+       VALUES (?,?,?,?,?,?,?,?,?)`
+    ).run(sid, req.params.id, name.trim(), position || "", department || "", email || "", phone || "", linkedUserId, Date.now());
+    // Tự động tích chọn vào dự án đang mở — người này ngay lập tức xuất hiện
+    // trong danh sách nhân viên của dự án, không cần thêm thao tác nào khác.
+    db.prepare(
+      "INSERT INTO project_staff (project_id, staff_id, added_at) VALUES (?,?,?)"
+    ).run(req.params.id, sid, Date.now());
+  });
+  tx();
   res.json({ project: fullProject(req.params.id, access.role) });
+});
+
+// Tích/bỏ tích hàng loạt: truyền TOÀN BỘ danh sách staffId đang muốn có mặt
+// trong dự án này — hệ thống tự thêm những ID mới, bỏ những ID không còn
+// trong danh sách. Đây là cách nhanh nhất để đưa người ĐÃ CÓ SẴN trong danh
+// bạ công ty (tạo ở dự án khác, hoặc do người khác tạo) vào dự án này chỉ
+// bằng cách tích chọn, không cần nhập lại tên/số điện thoại.
+router.put("/:id/staff-selection", (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id, "manageStaff");
+  if (!access) return;
+  const staffIds = Array.isArray(req.body?.staffIds) ? req.body.staffIds.filter(Boolean) : [];
+  const current = db.prepare("SELECT staff_id FROM project_staff WHERE project_id = ?").all(req.params.id).map(r => r.staff_id);
+  const currentSet = new Set(current);
+  const nextSet = new Set(staffIds);
+  const toAdd = staffIds.filter(id => !currentSet.has(id));
+  const toRemove = current.filter(id => !nextSet.has(id));
+
+  const tx = db.transaction(() => {
+    const now = Date.now();
+    for (const sid of toAdd) {
+      db.prepare("INSERT OR IGNORE INTO project_staff (project_id, staff_id, added_at) VALUES (?,?,?)").run(req.params.id, sid, now);
+    }
+    for (const sid of toRemove) {
+      db.prepare("DELETE FROM project_staff WHERE project_id = ? AND staff_id = ?").run(req.params.id, sid);
+      db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE project_id = ? AND assignee_staff_id = ?").run(req.params.id, sid);
+    }
+  });
+  tx();
+  res.json({ project: fullProject(req.params.id, access.role) });
+});
+
+// Bỏ tích 1 người khỏi 1 dự án cụ thể (KHÔNG xoá hồ sơ khỏi hệ thống — người
+// này vẫn còn trong danh bạ chung và ở các dự án khác họ đang tham gia).
+router.delete("/:id/staff/:staffId", (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id, "manageStaff");
+  if (!access) return;
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM project_staff WHERE project_id = ? AND staff_id = ?").run(req.params.id, req.params.staffId);
+    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE project_id = ? AND assignee_staff_id = ?").run(req.params.id, req.params.staffId);
+  });
+  tx();
+  res.json({ project: fullProject(req.params.id, access.role) });
+});
+
+// Xoá VĨNH VIỄN 1 người khỏi toàn bộ danh bạ công ty (mọi dự án). Chỉ cho
+// phép nếu người thao tác quản lý được dự án gốc đã tạo ra hồ sơ này, hoặc
+// là Quản trị hệ thống — để tránh ai cũng xoá được hồ sơ người khác.
+router.delete("/staff-directory/:staffId", (req, res) => {
+  const projectId = projectIdOfStaff(req.params.staffId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
+  const access = requireProjectAccess(req, res, projectId, "manageStaff");
+  if (!access) return;
+  const tx = db.transaction(() => {
+    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE assignee_staff_id = ?").run(req.params.staffId);
+    db.prepare("DELETE FROM project_staff WHERE staff_id = ?").run(req.params.staffId);
+    db.prepare("DELETE FROM staff WHERE id = ?").run(req.params.staffId);
+  });
+  tx();
+  res.json({ ok: true });
 });
 
 router.patch("/staff/:staffId", (req, res) => {
@@ -533,19 +625,6 @@ router.patch("/staff/:staffId", (req, res) => {
     vals.push(req.params.staffId);
     db.prepare(`UPDATE staff SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
   }
-  res.json({ project: fullProject(projectId, access.role) });
-});
-
-router.delete("/staff/:staffId", (req, res) => {
-  const projectId = projectIdOfStaff(req.params.staffId);
-  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
-  const access = requireProjectAccess(req, res, projectId, "manageStaff");
-  if (!access) return;
-  const tx = db.transaction(() => {
-    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE assignee_staff_id = ?").run(req.params.staffId);
-    db.prepare("DELETE FROM staff WHERE id = ?").run(req.params.staffId);
-  });
-  tx();
   res.json({ project: fullProject(projectId, access.role) });
 });
 
@@ -594,7 +673,7 @@ function computeProjectReport(projectId, range) {
   const soonLimit = new Date(Date.now() + (range === "week" ? 7 : 2) * 86400000).toISOString().slice(0, 10);
 
   const allTasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(projectId);
-  const staffList = db.prepare("SELECT * FROM staff WHERE project_id = ?").all(projectId);
+  const staffList = db.prepare("SELECT * FROM staff").all();
   const staffById = new Map(staffList.map(s => [s.id, s]));
 
   function labelFor(t) {
@@ -690,6 +769,43 @@ router.get("/:id/report/export", async (req, res) => {
   } catch (e) {
     console.error("[export] Lỗi xuất báo cáo:", e);
     res.status(500).json({ error: "Không tạo được file xuất báo cáo. Kiểm tra server đã cài đặt thư viện 'pdfkit' và 'docx' (npm install) chưa." });
+  }
+});
+
+// Xuất TOÀN BỘ danh sách công việc (đầy đủ mọi cột) ra Word — dùng làm tài
+// liệu cơ sở cho cuộc họp giao ban, khác với báo cáo ngày/tuần (chỉ tóm tắt).
+router.get("/:id/export-detail", async (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id);
+  if (!access) return;
+  const proj = fullProject(req.params.id, access.role);
+  if (!proj) return res.status(404).json({ error: "Không tìm thấy dự án" });
+  try {
+    const { buildDetailedProjectDocx } = require("../export");
+    const PHASE_LABELS = {
+      CT: "Chủ trương đầu tư & Lựa chọn nhà đầu tư",
+      QHDAT: "Quy hoạch & Đất đai",
+      XD: "Chuẩn bị đầu tư xây dựng",
+      THICONG: "Thi công & Nghiệm thu, bàn giao",
+    };
+    const groupsForDoc = proj.groups
+      .slice()
+      .sort((a, b) => a.order - b.order)
+      .map(g => ({ id: g.id, name: g.name, phaseLabel: PHASE_LABELS[g.phase] || g.phase }));
+    const tasksForDoc = proj.tasks.map(t => ({
+      group: t.group, title: t.title, unitDo: t.unitDo, unitCoord: t.unitCoord, duration: t.duration,
+      legal: t.legal, status: t.progress.status, due: t.progress.due, dueLocked: t.progress.dueLocked,
+      note: t.progress.note,
+      assigneeName: t.progress.assigneeStaffId
+        ? (proj.staff.find(s => s.id === t.progress.assigneeStaffId)?.name || "")
+        : t.progress.assignee,
+    }));
+    const buffer = await buildDetailedProjectDocx(proj.name, groupsForDoc, tasksForDoc);
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="chi-tiet-cong-viec.docx"`);
+    res.send(buffer);
+  } catch (e) {
+    console.error("[export] Lỗi xuất báo cáo chi tiết:", e);
+    res.status(500).json({ error: "Không tạo được file xuất báo cáo. Kiểm tra server đã cài đặt thư viện 'docx' (npm install) chưa." });
   }
 });
 

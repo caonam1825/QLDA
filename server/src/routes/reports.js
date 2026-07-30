@@ -22,7 +22,7 @@ router.get("/overview", (req, res) => {
   const placeholders = projectIds.map(() => "?").join(",");
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds);
   const allTasks = db.prepare(`SELECT * FROM tasks WHERE project_id IN (${placeholders})`).all(...projectIds);
-  const allStaff = db.prepare(`SELECT * FROM staff WHERE project_id IN (${placeholders})`).all(...projectIds);
+  const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const staffById = new Map(allStaff.map(s => [s.id, s]));
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));
 
@@ -37,12 +37,19 @@ router.get("/overview", (req, res) => {
   const perProject = new Map(projects.map(p => [p.id, { id: p.id, name: p.name, total: 0, done: 0, doing: 0, todo: 0, blocked: 0, overdue: 0 }]));
   const overdueList = [];
   const dueSoonList = [];
+  const inProgressList = [];
 
   for (const t of allTasks) {
     const bucket = perProject.get(t.project_id);
     if (!bucket) continue;
     bucket.total++;
     bucket[t.status] = (bucket[t.status] || 0) + 1;
+    if (t.status === "doing") {
+      inProgressList.push({
+        id: t.id, title: t.title, due: t.due_date || "", assignee: labelFor(t),
+        projectId: t.project_id, projectName: projectNameById.get(t.project_id) || "",
+      });
+    }
     if (t.due_date && t.status !== "done" && t.due_date < todayStr) {
       bucket.overdue++;
       overdueList.push({
@@ -57,6 +64,7 @@ router.get("/overview", (req, res) => {
     }
   }
 
+  inProgressList.sort((a, b) => (a.due || "9999") < (b.due || "9999") ? -1 : 1);
   overdueList.sort((a, b) => (a.due < b.due ? -1 : 1));
   dueSoonList.sort((a, b) => (a.due < b.due ? -1 : 1));
 
@@ -70,7 +78,7 @@ router.get("/overview", (req, res) => {
     { total: 0, done: 0, overdue: 0 }
   );
 
-  res.json({ projects: projectSummaries, overdueList, dueSoonList, totals });
+  res.json({ projects: projectSummaries, overdueList, dueSoonList, inProgressList, totals });
 });
 
 /* ---------------- Xếp hạng KPI nhân viên ---------------- */
@@ -89,7 +97,7 @@ function computeKpiRanking() {
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds);
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));
   const allTasks = db.prepare(`SELECT * FROM tasks WHERE project_id IN (${placeholders}) AND assignee_staff_id != ''`).all(...projectIds);
-  const allStaff = db.prepare(`SELECT * FROM staff WHERE project_id IN (${placeholders})`).all(...projectIds);
+  const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const staffById = new Map(allStaff.map(s => [s.id, s]));
 
   const todayStr = new Date().toISOString().slice(0, 10);
@@ -191,7 +199,7 @@ router.get("/by-person", (req, res) => {
   const projectIds = allProjectIds();
   if (projectIds.length === 0) return res.json({ tasks: [] });
   const placeholders = projectIds.map(() => "?").join(",");
-  const allStaff = db.prepare(`SELECT * FROM staff WHERE project_id IN (${placeholders})`).all(...projectIds);
+  const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const matchStaffIds = allStaff
     .filter(s => (s.phone ? `phone:${s.phone}` : `name:${s.name}|${s.department}`) === key)
     .map(s => s.id);
@@ -222,7 +230,7 @@ function getOverviewData(userId) {
     ? db.prepare(`SELECT * FROM tasks WHERE project_id IN (${projectIds.map(() => "?").join(",")})`).all(...projectIds)
     : [];
   const allStaff = projectIds.length
-    ? db.prepare(`SELECT * FROM staff WHERE project_id IN (${projectIds.map(() => "?").join(",")})`).all(...projectIds)
+    ? db.prepare(`SELECT * FROM staff`).all()
     : [];
   const staffById = new Map(allStaff.map(s => [s.id, s]));
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Home from "./pages/Home";
 import Dashboard from "./pages/Dashboard";
 import { api, getToken, setToken } from "./api";
 
@@ -8,6 +9,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [checking, setChecking] = useState(true);
   const [view, setView] = useState("login"); // 'login' | 'register'
+  const [activeProjectId, setActiveProjectId] = useState(null); // null = màn hình chính (tất cả dự án)
 
   useEffect(() => {
     (async () => {
@@ -27,6 +29,7 @@ export default function App() {
     setToken(null);
     setUser(null);
     setView("login");
+    setActiveProjectId(null);
   }
 
   if (checking) {
@@ -45,5 +48,19 @@ export default function App() {
     );
   }
 
-  return <Dashboard user={user} onLogout={handleLogout} />;
+  // Màn hình chính: tất cả dự án + thông số tổng quan. Bấm vào 1 dự án mới
+  // vào chi tiết (giao việc, tiến độ…). Bấm "Trang chủ" trong chi tiết dự án
+  // để quay lại đây.
+  if (!activeProjectId) {
+    return <Home user={user} onLogout={handleLogout} onOpenProject={setActiveProjectId} />;
+  }
+
+  return (
+    <Dashboard
+      user={user}
+      onLogout={handleLogout}
+      initialProjectId={activeProjectId}
+      onBackHome={() => setActiveProjectId(null)}
+    />
+  );
 }
