@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
   FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
+  MessageSquare, ListChecks,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS, isOverdue } from "../constants";
@@ -13,6 +14,8 @@ import StaffPanel from "../components/StaffPanel";
 import ReportPanel from "../components/ReportPanel";
 import OverviewPanel from "../components/OverviewPanel";
 import AdminPanel from "../components/AdminPanel";
+import ChatPanel from "../components/ChatPanel";
+import MyTasksPanel from "../components/MyTasksPanel";
 import NextSteps from "../components/NextSteps";
 
 const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
@@ -35,6 +38,8 @@ export default function Dashboard({ user, onLogout }) {
   const [reportOpen, setReportOpen] = useState(false);
   const [overviewOpen, setOverviewOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [myTasksOpen, setMyTasksOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
 
   const loadProjectList = useCallback(async (preferId) => {
@@ -212,10 +217,18 @@ export default function Dashboard({ user, onLogout }) {
 
   return (
     <div className="app-root">
+      <div className="app-topbar">
+        <button className="topbar-btn topbar-btn-primary" onClick={() => setMyTasksOpen(true)} type="button">
+          <ListChecks size={14} /> Việc của tôi
+        </button>
+        <button className="topbar-btn" onClick={() => setChatOpen(true)} type="button">
+          <MessageSquare size={14} /> Chat
+        </button>
+      </div>
       <header className="app-header">
         <div className="app-header-inner">
           <div className="app-header-text">
-            <span className="app-eyebrow">HỒ SƠ THỦ TỤC ĐẦU TƯ · ĐẤT ĐAI · XÂY DỰNG</span>
+            <span className="app-eyebrow">BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC</span>
             <div className="app-header-title-row">
               <h1>{project.name}</h1>
               <ProjectSwitcher
@@ -225,6 +238,7 @@ export default function Dashboard({ user, onLogout }) {
                 onCreate={handleCreateProject}
                 onRename={handleRenameProject}
                 onDelete={handleDeleteProject}
+                onShowAll={() => setOverviewOpen(true)}
               />
               <button className="members-btn" onClick={() => setMembersOpen(true)} type="button">
                 <Users size={14} /> Thành viên ({project.members.length})
@@ -422,6 +436,14 @@ export default function Dashboard({ user, onLogout }) {
 
       {adminOpen && (
         <AdminPanel currentUserId={user.id} onClose={() => setAdminOpen(false)} />
+      )}
+
+      {chatOpen && (
+        <ChatPanel currentUser={user} projectId={currentId} projectName={project.name} onClose={() => setChatOpen(false)} />
+      )}
+
+      {myTasksOpen && (
+        <MyTasksPanel onClose={() => setMyTasksOpen(false)} />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import { ROLE_OPTIONS } from "../constants";
 import PersonTasksModal from "./PersonTasksModal";
 
 const emptyForm = { name: "", position: "", department: "", email: "", phone: "" };
-const emptyLogin = { grantLogin: false, loginPhone: "", loginPassword: "", role: "viewer" };
+const emptyLogin = { mode: "none", loginPhone: "", loginPassword: "", role: "viewer" }; // mode: 'none' | 'grant' | 'link'
 
 export default function StaffPanel({ project, canManage, onClose, onChanged }) {
   const [form, setForm] = useState(emptyForm);
@@ -46,10 +46,13 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
         await api.updateStaff(editingId, form);
       } else {
         const payload = { ...form };
-        if (login.grantLogin) {
+        if (login.mode === "grant") {
           payload.grantLogin = true;
           payload.loginPhone = login.loginPhone || form.phone;
           payload.loginPassword = login.loginPassword;
+          payload.role = login.role;
+        } else if (login.mode === "link") {
+          payload.linkExistingPhone = login.loginPhone || form.phone;
           payload.role = login.role;
         }
         await api.addStaff(project.id, payload);
@@ -90,8 +93,9 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
         </div>
 
         <p className="invite-hint">
-          Thêm nhân viên vào danh bạ để gán việc — <b>không cần họ tự đăng ký</b>. Nếu muốn nhân viên tự đăng
-          nhập xem/cập nhật việc của mình, tick "Cấp tài khoản đăng nhập" khi thêm mới và chọn quyền phù hợp.
+          Thêm nhân viên vào danh bạ để gán việc — <b>không cần họ tự đăng ký</b>. Nếu nhân viên đã có tài khoản
+          (tự đăng ký hoặc được cấp ở dự án khác), chọn "✓ Đã có tài khoản" và chỉ cần nhập đúng SĐT để liên kết —
+          không cần đặt lại mật khẩu. Nếu họ chưa có tài khoản, chọn "Cấp tài khoản mới" để admin tự đặt SĐT + mật khẩu.
         </p>
 
         <div className="members-list">
@@ -101,12 +105,17 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
           {project.staff.map(s => (
             <div key={s.id} className="staff-block">
               <div className="member-row staff-row">
-                <div className="member-info">
-                  <span className="member-name member-name-clickable" onClick={() => setTasksFor(s)}>{s.name}</span>
-                  <span className="member-email">
-                    {[s.position, s.department].filter(Boolean).join(" · ") || "—"}
-                    {s.email ? ` · ${s.email}` : ""}
+                <div className="member-info member-info-with-avatar">
+                  <span className="avatar-circle avatar-clickable" onClick={() => setTasksFor(s)} title={`Xem việc của ${s.name}`}>
+                    {(s.name || "?").trim().charAt(0).toUpperCase()}
                   </span>
+                  <div>
+                    <span className="member-name member-name-clickable" onClick={() => setTasksFor(s)}>{s.name}</span>
+                    <span className="member-email">
+                      {[s.position, s.department].filter(Boolean).join(" · ") || "—"}
+                      {s.email ? ` · ${s.email}` : ""}
+                    </span>
+                  </div>
                 </div>
                 {s.hasLogin && (
                   <span className="zalo-status zalo-status-on"><KeyRound size={12} /> Có tài khoản đăng nhập</span>
@@ -154,16 +163,39 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
 
             {!editingId && (
               <div className="staff-login-box">
-                <label className="staff-login-toggle">
-                  <input type="checkbox" checked={login.grantLogin}
-                    onChange={e => setLogin(l => ({ ...l, grantLogin: e.target.checked }))} />
-                  <span>Cấp tài khoản đăng nhập cho nhân viên này (không cần họ tự đăng ký)</span>
-                </label>
-                {login.grantLogin && (
+                <div className="staff-login-mode-row">
+                  <label className="staff-login-toggle">
+                    <input type="radio" name="loginMode" checked={login.mode === "none"}
+                      onChange={() => setLogin(l => ({ ...l, mode: "none" }))} />
+                    <span>Không cấp đăng nhập (chỉ thêm vào danh bạ)</span>
+                  </label>
+                  <label className="staff-login-toggle">
+                    <input type="radio" name="loginMode" checked={login.mode === "link"}
+                      onChange={() => setLogin(l => ({ ...l, mode: "link" }))} />
+                    <span>✓ Nhân viên đã có tài khoản — chỉ liên kết bằng SĐT</span>
+                  </label>
+                  <label className="staff-login-toggle">
+                    <input type="radio" name="loginMode" checked={login.mode === "grant"}
+                      onChange={() => setLogin(l => ({ ...l, mode: "grant" }))} />
+                    <span>Cấp tài khoản mới (đặt SĐT + mật khẩu)</span>
+                  </label>
+                </div>
+
+                {login.mode === "link" && (
+                  <div className="staff-form-grid">
+                    <input type="tel" placeholder="SĐT đã đăng ký (mặc định lấy SĐT ở trên) *" required
+                      value={login.loginPhone} onChange={e => setLogin(l => ({ ...l, loginPhone: e.target.value }))} />
+                    <select value={login.role} onChange={e => setLogin(l => ({ ...l, role: e.target.value }))}>
+                      {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                    </select>
+                  </div>
+                )}
+
+                {login.mode === "grant" && (
                   <div className="staff-form-grid">
                     <input type="tel" placeholder="SĐT đăng nhập (mặc định lấy SĐT ở trên)"
                       value={login.loginPhone} onChange={e => setLogin(l => ({ ...l, loginPhone: e.target.value }))} />
-                    <input type="text" placeholder="Mật khẩu (tối thiểu 6 ký tự) *" required={login.grantLogin}
+                    <input type="text" placeholder="Mật khẩu (tối thiểu 6 ký tự) *" required
                       value={login.loginPassword} onChange={e => setLogin(l => ({ ...l, loginPassword: e.target.value }))} />
                     <select value={login.role} onChange={e => setLogin(l => ({ ...l, role: e.target.value }))}>
                       {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}

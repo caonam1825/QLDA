@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { FolderOpen, ChevronsUpDown, Check, Pencil, Trash2, Plus, Layers, FileText } from "lucide-react";
+import { FolderOpen, ChevronsUpDown, Check, Pencil, Trash2, Plus, Layers, FileText, LayoutGrid } from "lucide-react";
 import { IconBtn, ConfirmButton } from "./Basics";
 
-export default function ProjectSwitcher({ projects, currentId, onSelect, onCreate, onRename, onDelete }) {
+export default function ProjectSwitcher({ projects, currentId, onSelect, onCreate, onRename, onDelete, onShowAll }) {
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -32,6 +32,18 @@ export default function ProjectSwitcher({ projects, currentId, onSelect, onCreat
 
       {open && (
         <div className="switcher-panel">
+          {onShowAll && (
+            <>
+              <button
+                className="switcher-item-name switcher-all-projects-btn"
+                onClick={() => { onShowAll(); setOpen(false); }}
+                type="button"
+              >
+                <LayoutGrid size={13} /> Tất cả dự án (Tổng hợp)
+              </button>
+              <div className="switcher-divider" />
+            </>
+          )}
           <div className="switcher-list">
             {projects.map(p => (
               <div key={p.id} className={`switcher-item ${p.id === currentId ? "switcher-item-active" : ""}`}>

@@ -448,19 +448,39 @@ router.delete("/tasks/:taskId", (req, res) => {
 
 /* ---------------- staff directory (nhân viên) ---------------- */
 
-// Thêm nhân viên — KHÔNG cần nhân viên tự đăng ký. Có 2 chế độ:
+// Thêm nhân viên — KHÔNG cần nhân viên tự đăng ký. Có 3 chế độ:
 //  1) Chỉ thêm vào danh bạ (mặc định) — dùng để gán công việc, không đăng nhập được.
-//  2) grantLogin=true — admin cấp luôn tài khoản đăng nhập (SĐT + mật khẩu do
-//     admin đặt) và thêm thẳng vào dự án với vai trò chỉ định, không qua màn
-//     hình "Đăng ký" — nhân viên chỉ cần được admin gửi cho SĐT/mật khẩu.
+//  2) grantLogin=true — admin cấp TÀI KHOẢN MỚI (SĐT + mật khẩu do admin đặt),
+//     thêm thẳng vào dự án với vai trò chỉ định, không qua màn hình "Đăng ký".
+//  3) linkExistingPhone — nhân viên ĐÃ CÓ tài khoản (tự đăng ký từ trước hoặc
+//     được cấp ở dự án khác) — chỉ cần nhập đúng SĐT đã đăng ký để liên kết,
+//     không cần đặt lại mật khẩu.
 router.post("/:id/staff", (req, res) => {
   const access = requireProjectAccess(req, res, req.params.id, "manageStaff");
   if (!access) return;
-  const { name, position, department, email, phone, grantLogin, loginPhone, loginPassword, role } = req.body || {};
+  const {
+    name, position, department, email, phone,
+    grantLogin, loginPhone, loginPassword,
+    linkExistingPhone, role,
+  } = req.body || {};
   if (!name || !name.trim()) return res.status(400).json({ error: "Thiếu tên nhân viên" });
 
   let linkedUserId = "";
-  if (grantLogin) {
+
+  if (linkExistingPhone) {
+    const user = db.prepare("SELECT * FROM users WHERE phone = ?").get(normalizePhone(linkExistingPhone));
+    if (!user) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản nào đã đăng ký với số điện thoại này." });
+    }
+    linkedUserId = user.id;
+    const already = getMembership(req.params.id, user.id);
+    const finalRole = isKnownRole(role) && role !== "owner" ? role : "viewer";
+    if (!already) {
+      db.prepare(
+        "INSERT INTO project_members (project_id, user_id, role, added_at) VALUES (?,?,?,?)"
+      ).run(req.params.id, user.id, finalRole, Date.now());
+    }
+  } else if (grantLogin) {
     const rawPhone = loginPhone || phone;
     if (!rawPhone || !isValidVNPhone(rawPhone)) {
       return res.status(400).json({ error: "Số điện thoại cấp tài khoản không hợp lệ" });
@@ -558,11 +578,7 @@ router.delete("/staff/:staffId/zalo-link", (req, res) => {
 
 /* ---------------- báo cáo ngày / tuần ---------------- */
 
-router.get("/:id/report", (req, res) => {
-  const access = requireProjectAccess(req, res, req.params.id);
-  if (!access) return;
-  const range = req.query.range === "week" ? "week" : "day";
-
+function computeProjectReport(projectId, range) {
   const now = new Date();
   let rangeStart;
   if (range === "day") {
@@ -577,8 +593,8 @@ router.get("/:id/report", (req, res) => {
   const todayStr = new Date().toISOString().slice(0, 10);
   const soonLimit = new Date(Date.now() + (range === "week" ? 7 : 2) * 86400000).toISOString().slice(0, 10);
 
-  const allTasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(req.params.id);
-  const staffList = db.prepare("SELECT * FROM staff WHERE project_id = ?").all(req.params.id);
+  const allTasks = db.prepare("SELECT * FROM tasks WHERE project_id = ?").all(projectId);
+  const staffList = db.prepare("SELECT * FROM staff WHERE project_id = ?").all(projectId);
   const staffById = new Map(staffList.map(s => [s.id, s]));
 
   function labelFor(t) {
@@ -631,7 +647,7 @@ router.get("/:id/report", (req, res) => {
     if (t.due_date && t.status !== "done" && t.due_date < todayStr) b.overdue++;
   }
 
-  res.json({
+  return {
     range,
     rangeStart,
     updatedTasks: updatedInRange,
@@ -642,7 +658,39 @@ router.get("/:id/report", (req, res) => {
     dueSoonList: upcomingList, // giữ tên cũ để tương thích ngược
     upcomingList,
     byStaff: Array.from(byStaffMap.values()).sort((a, b) => b.done - a.done),
-  });
+  };
+}
+
+router.get("/:id/report", (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id);
+  if (!access) return;
+  const range = req.query.range === "week" ? "week" : "day";
+  res.json(computeProjectReport(req.params.id, range));
+});
+
+router.get("/:id/report/export", async (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id);
+  if (!access) return;
+  const range = req.query.range === "week" ? "week" : "day";
+  const format = req.query.format === "docx" ? "docx" : "pdf";
+  const proj = db.prepare("SELECT name FROM projects WHERE id = ?").get(req.params.id);
+  const data = computeProjectReport(req.params.id, range);
+  try {
+    const { buildProjectReportPdf, buildProjectReportDocx } = require("../export");
+    const buffer = format === "docx"
+      ? await buildProjectReportDocx(proj.name, range, data)
+      : await buildProjectReportPdf(proj.name, range, data);
+    const ext = format === "docx" ? "docx" : "pdf";
+    const mime = format === "docx"
+      ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      : "application/pdf";
+    res.setHeader("Content-Type", mime);
+    res.setHeader("Content-Disposition", `attachment; filename="bao-cao-${range === "week" ? "tuan" : "ngay"}.${ext}"`);
+    res.send(buffer);
+  } catch (e) {
+    console.error("[export] Lỗi xuất báo cáo:", e);
+    res.status(500).json({ error: "Không tạo được file xuất báo cáo. Kiểm tra server đã cài đặt thư viện 'pdfkit' và 'docx' (npm install) chưa." });
+  }
 });
 
 module.exports = router;

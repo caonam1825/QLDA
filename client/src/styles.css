@@ -407,3 +407,69 @@ body {
 
 .members-btn-admin { border-color: var(--gold); color: var(--gold); }
 .members-btn-admin:hover { background: var(--gold-soft); }
+
+/* --- Thanh trên cùng (Việc của tôi / Chat) --- */
+.app-topbar {
+  display: flex; gap: 8px; justify-content: flex-end; align-items: center;
+  padding: 6px 24px; background: var(--navy); border-bottom: 1px solid var(--navy-soft);
+}
+.topbar-btn {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 5px 12px;
+  border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: transparent;
+  color: #EDEADD; cursor: pointer;
+}
+.topbar-btn:hover { background: rgba(255,255,255,0.1); }
+.topbar-btn-primary { background: var(--gold); border-color: var(--gold); color: var(--navy); font-weight: 600; }
+.topbar-btn-primary:hover { background: #c29a3d; }
+
+/* --- Avatar nhân viên --- */
+.member-info-with-avatar { display: flex; align-items: center; gap: 10px; }
+.avatar-circle {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; border-radius: 50%; background: var(--navy); color: #fff;
+  font-size: 13px; font-weight: 600; flex-shrink: 0;
+}
+.avatar-clickable { cursor: pointer; }
+.avatar-clickable:hover { background: var(--gold); color: var(--navy); }
+
+/* --- Chọn chế độ cấp tài khoản nhân viên --- */
+.staff-login-mode-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
+
+/* --- Nút xuất báo cáo --- */
+.report-tabs-spacer { flex: 1; }
+.export-btn {
+  display: inline-flex; align-items: center; gap: 5px; font-size: 12px; padding: 5px 10px;
+  border-radius: 6px; border: 1px solid var(--line); background: #fff; color: var(--navy); cursor: pointer;
+}
+.export-btn:hover:not(:disabled) { background: var(--paper); }
+.export-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- "Tất cả dự án" trong ProjectSwitcher --- */
+.switcher-all-projects-btn { font-weight: 600; color: var(--gold); }
+.switcher-all-projects-btn:hover { background: var(--gold-soft); }
+
+/* --- Chat --- */
+.chat-card { display: flex; flex-direction: column; max-height: 80vh; }
+.chat-messages {
+  flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 4px; min-height: 200px; max-height: 45vh;
+}
+.chat-bubble-row { display: flex; justify-content: flex-start; }
+.chat-bubble-row-mine { justify-content: flex-end; }
+.chat-bubble {
+  max-width: 75%; background: var(--paper); border: 1px solid var(--line); border-radius: 10px;
+  padding: 6px 10px; font-size: 13px;
+}
+.chat-bubble-mine { background: var(--navy); color: #fff; border-color: var(--navy); }
+.chat-bubble-sender { font-size: 11px; font-weight: 600; color: var(--gold); margin-bottom: 2px; }
+.chat-bubble-body { white-space: pre-wrap; word-break: break-word; }
+.chat-bubble-time { font-size: 10px; opacity: 0.6; margin-top: 3px; text-align: right; }
+.chat-input-row { display: flex; gap: 8px; margin-top: 10px; }
+.chat-input-row input {
+  flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--line); font-size: 13px;
+}
+.chat-input-row button {
+  display: inline-flex; align-items: center; justify-content: center; width: 38px;
+  border-radius: 6px; border: none; background: var(--navy); color: #fff; cursor: pointer;
+}
+.chat-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }

@@ -8,6 +8,7 @@ const projectRoutes = require("./routes/projects");
 const reportRoutes = require("./routes/reports");
 const zaloRoutes = require("./routes/zalo");
 const adminRoutes = require("./routes/admin");
+const chatRoutes = require("./routes/chat");
 const { startReminderScheduler } = require("./reminders");
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/zalo", zaloRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/chat", chatRoutes);
 
 app.get("/api/health", (req, res) => res.json({ ok: true }));
 

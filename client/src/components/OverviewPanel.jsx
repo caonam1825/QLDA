@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { LayoutGrid, X, AlertTriangle, Clock3, Trophy } from "lucide-react";
+import { LayoutGrid, X, AlertTriangle, Clock3, Trophy, FileDown, FileText } from "lucide-react";
 import { api } from "../api";
 import PersonTasksModal from "./PersonTasksModal";
 
@@ -10,6 +10,18 @@ export default function OverviewPanel({ onClose }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [personFor, setPersonFor] = useState(null); // { key, name }
+  const [exporting, setExporting] = useState("");
+
+  async function handleExport(format) {
+    setExporting(format);
+    try {
+      await api.exportOverview(format);
+    } catch (e) {
+      setError(e.message || "Không xuất được báo cáo");
+    } finally {
+      setExporting("");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -32,6 +44,13 @@ export default function OverviewPanel({ onClose }) {
         <div className="report-tabs">
           <button className={`report-tab ${tab === "overview" ? "report-tab-active" : ""}`} onClick={() => setTab("overview")} type="button">Tổng hợp dự án</button>
           <button className={`report-tab ${tab === "kpi" ? "report-tab-active" : ""}`} onClick={() => setTab("kpi")} type="button">Xếp hạng KPI nhân viên</button>
+          <span className="report-tabs-spacer" />
+          <button className="export-btn" disabled={!!exporting} onClick={() => handleExport("pdf")} type="button">
+            <FileDown size={13} /> {exporting === "pdf" ? "Đang xuất…" : "Xuất PDF"}
+          </button>
+          <button className="export-btn" disabled={!!exporting} onClick={() => handleExport("docx")} type="button">
+            <FileText size={13} /> {exporting === "docx" ? "Đang xuất…" : "Xuất Word"}
+          </button>
         </div>
 
         {loading && <p className="invite-hint">Đang tải…</p>}

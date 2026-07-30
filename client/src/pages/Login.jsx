@@ -26,7 +26,7 @@ export default function Login({ onAuthed, goRegister }) {
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
-        <div className="auth-eyebrow">HỒ SƠ THỦ TỤC ĐẦU TƯ · ĐẤT ĐAI · XÂY DỰNG</div>
+        <div className="auth-eyebrow">BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC</div>
         <h1>Đăng nhập</h1>
         <p className="auth-sub">Quản lý &amp; giao việc theo dự án — nhiều người cùng dùng chung.</p>
 

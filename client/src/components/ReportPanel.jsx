@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { BarChart3, X, AlertTriangle, Clock3, CheckCircle2, Loader2, Lock } from "lucide-react";
+import { BarChart3, X, AlertTriangle, Clock3, CheckCircle2, Loader2, Lock, FileDown, FileText } from "lucide-react";
 import { api } from "../api";
 import { PHASES } from "../constants";
 
@@ -34,6 +34,18 @@ export default function ReportPanel({ projectId, onClose }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [exporting, setExporting] = useState("");
+
+  async function handleExport(format) {
+    setExporting(format);
+    try {
+      await api.exportProjectReport(projectId, range, format);
+    } catch (e) {
+      setError(e.message || "Không xuất được báo cáo");
+    } finally {
+      setExporting("");
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -56,6 +68,13 @@ export default function ReportPanel({ projectId, onClose }) {
         <div className="report-tabs">
           <button className={`report-tab ${range === "day" ? "report-tab-active" : ""}`} onClick={() => setRange("day")} type="button">Báo cáo ngày</button>
           <button className={`report-tab ${range === "week" ? "report-tab-active" : ""}`} onClick={() => setRange("week")} type="button">Báo cáo tuần</button>
+          <span className="report-tabs-spacer" />
+          <button className="export-btn" disabled={!!exporting} onClick={() => handleExport("pdf")} type="button">
+            <FileDown size={13} /> {exporting === "pdf" ? "Đang xuất…" : "Xuất PDF"}
+          </button>
+          <button className="export-btn" disabled={!!exporting} onClick={() => handleExport("docx")} type="button">
+            <FileText size={13} /> {exporting === "docx" ? "Đang xuất…" : "Xuất Word"}
+          </button>
         </div>
 
         {loading && <p className="invite-hint"><Loader2 size={13} className="spin" /> Đang tải…</p>}

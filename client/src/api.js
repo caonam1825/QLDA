@@ -65,6 +65,34 @@ export const api = {
   adminListUsers: () => request("GET", "/admin/users"),
   adminSetSuperAdmin: (userId, value) => request("PATCH", `/admin/users/${userId}/super-admin`, { value }),
 
+  getChatMessages: (room) => request("GET", `/chat/${room}/messages`),
+  sendChatMessage: (room, body) => request("POST", `/chat/${room}/messages`, { body }),
+
+  downloadFile: async (path, filename) => {
+    const headers = {};
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(`/api${path}`, { headers });
+    if (!res.ok) {
+      let msg = `Lỗi ${res.status}`;
+      try { const data = await res.json(); if (data && data.error) msg = data.error; } catch (e) { /* empty */ }
+      throw new Error(msg);
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
+  exportProjectReport: (projectId, range, format) =>
+    api.downloadFile(`/projects/${projectId}/report/export?range=${range}&format=${format}`, `bao-cao-${range === "week" ? "tuan" : "ngay"}.${format}`),
+  exportOverview: (format) =>
+    api.downloadFile(`/reports/overview/export?format=${format}`, `tong-hop-kpi.${format}`),
+
   addGroup: (projectId, phase, name) => request("POST", `/projects/${projectId}/groups`, { phase, name }),
   renameGroup: (groupId, name) => request("PATCH", `/projects/groups/${groupId}`, { name }),
   deleteGroup: (groupId) => request("DELETE", `/projects/groups/${groupId}`),

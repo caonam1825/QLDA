@@ -94,12 +94,25 @@ CREATE TABLE IF NOT EXISTS reminder_log (
   UNIQUE(task_id, kind, sent_date)
 );
 
+-- Chat giữa các thành viên. room = 'global' (toàn công ty) hoặc project_id
+-- (chat riêng của 1 dự án). Không mã hoá đầu-cuối — đây là chat nội bộ đơn
+-- giản, không dùng cho thông tin nhạy cảm.
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY,
+  room TEXT NOT NULL,
+  sender_id TEXT NOT NULL,
+  sender_name TEXT NOT NULL,
+  body TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_groups_project ON groups_(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_group ON tasks(group_id);
 CREATE INDEX IF NOT EXISTS idx_members_user ON project_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_staff_project ON staff(project_id);
 CREATE INDEX IF NOT EXISTS idx_staff_phone ON staff(phone);
+CREATE INDEX IF NOT EXISTS idx_messages_room ON messages(room, created_at);
 `);
 
 // Safe migration for databases created before the "staff" feature existed:

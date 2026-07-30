@@ -196,9 +196,26 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
 - **Việc của tôi & lọc nhanh**: mỗi nhân viên/quản lý có tài khoản đăng nhập
   thấy ngay nút "Việc của tôi" cùng các lọc nhanh Đang thực hiện / Đã hoàn
   thành / Trễ hạn ngay trên thanh công cụ, không cần dựng lại bộ lọc mỗi lần.
-- **Bấm vào tên xem việc đang phụ trách**: bấm vào tên nhân viên (mục Nhân
-  viên) hoặc tên trong bảng xếp hạng KPI để xem ngay danh sách công việc đang
-  phụ trách kèm hạn hoàn thành, không cần lọc thủ công.
+- **Bấm vào tên xem việc đang phụ trách**: bấm vào avatar hoặc tên nhân viên
+  (mục Nhân viên) hoặc tên trong bảng xếp hạng KPI để xem ngay danh sách công
+  việc — được nhóm rõ theo Trễ hạn / Đang thực hiện / Chưa bắt đầu / Đã hoàn
+  thành, không cần lọc thủ công.
+- **Việc của tôi (toàn hệ thống)**: nút "Việc của tôi" đặt ngay trên cùng màn
+  hình (mọi trang) — dành cho cả nhân viên lẫn quản lý có tài khoản đăng nhập,
+  thống kê toàn bộ công việc đang phụ trách trên **tất cả dự án**, nhóm theo
+  Trễ hạn / Đang thực hiện / Chưa bắt đầu / Đã hoàn thành.
+- **Chat giữa các thành viên**: nút "Chat" trên cùng màn hình — có phòng
+  "Toàn công ty" và phòng riêng theo từng dự án; tự làm mới mỗi 8 giây.
+- **Thêm nhân viên đã có tài khoản chỉ bằng 1 cú nhấp**: khi thêm nhân viên,
+  chọn "✓ Nhân viên đã có tài khoản" và nhập đúng số điện thoại đã đăng ký —
+  hệ thống tự liên kết, không cần đặt lại mật khẩu (khác với "Cấp tài khoản
+  mới", dùng khi nhân viên chưa từng có tài khoản).
+- **"Tất cả dự án" trong bộ chọn dự án**: mục chọn dự án trên header giờ có
+  thêm lựa chọn ghim đầu "Tất cả dự án (Tổng hợp)" để mở thẳng báo cáo tổng
+  hợp & KPI toàn công ty mà không cần chọn từng dự án.
+- **Xuất báo cáo ra PDF / Word**: cả báo cáo ngày/tuần theo dự án lẫn báo cáo
+  tổng hợp & KPI toàn hệ thống đều có nút "Xuất PDF" và "Xuất Word" tải file
+  về máy trực tiếp.
 
 ## 7. Cập nhật bản đang chạy (nếu đã triển khai trước đó)
 
@@ -296,3 +313,18 @@ tin lại với OA trong thời gian dài, tin nhắc việc có thể không g�
 - Icon mặc định là icon tạm (chữ "NAM" nền xanh) — nên thay bằng logo thật của
   công ty tại `client/public/icon-192.png`, `icon-512.png`,
   `icon-maskable-512.png` (giữ nguyên tên file và kích thước).
+
+## 11. Xuất báo cáo PDF / Word — cần cài thêm thư viện
+
+Tính năng "Xuất PDF" / "Xuất Word" dùng 2 thư viện Node mới: `pdfkit` và
+`docx`. Đã được thêm sẵn vào `server/package.json`, chỉ cần:
+
+```bash
+cd server
+npm install
+```
+
+Nếu chưa `npm install` lại sau khi cập nhật, khi bấm "Xuất PDF"/"Xuất Word"
+server sẽ báo lỗi rõ ràng "Kiểm tra server đã cài đặt thư viện 'pdfkit' và
+'docx' chưa" thay vì crash — cứ chạy `npm install` rồi khởi động lại server
+là dùng được ngay, không cần thao tác gì thêm với dữ liệu.
