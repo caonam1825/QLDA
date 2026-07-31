@@ -1,0 +1,17 @@
+services:
+  app:
+    build: .
+    image: nam-project-app:latest
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      PORT: "4000"
+      # ĐỔI chuỗi này thành một chuỗi bí mật ngẫu nhiên, dài, trước khi triển khai thật!
+      JWT_SECRET: "doi-chuoi-bi-mat-nay-truoc-khi-chay-that-please-change-me"
+      DB_PATH: "/app/server/data/app.db"
+    volumes:
+      - nam-app-data:/app/server/data
+
+volumes:
+  nam-app-data:

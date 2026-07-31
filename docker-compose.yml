@@ -1,17 +1,23 @@
-services:
-  app:
-    build: .
-    image: nam-project-app:latest
-    restart: unless-stopped
-    ports:
-      - "4000:4000"
-    environment:
-      PORT: "4000"
-      # ĐỔI chuỗi này thành một chuỗi bí mật ngẫu nhiên, dài, trước khi triển khai thật!
-      JWT_SECRET: "doi-chuoi-bi-mat-nay-truoc-khi-chay-that-please-change-me"
-      DB_PATH: "/app/server/data/app.db"
-    volumes:
-      - nam-app-data:/app/server/data
-
-volumes:
-  nam-app-data:
+{
+  "name": "nam-project-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "start:litestream": "sh scripts/start-with-litestream.sh",
+    "dev": "node src/index.js",
+    "build": "cd ../client && npm install && npm run build && cd ../server && sh scripts/download-litestream.sh"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.3.0",
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "docx": "^9.0.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "nanoid": "^3.3.7",
+    "pdfkit": "^0.15.0"
+  }
+}
