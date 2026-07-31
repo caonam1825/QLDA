@@ -1,28 +1,26 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   FolderKanban, Users2, ClipboardList, AlertTriangle, Clock3, LogOut,
-  ListChecks, MessageSquare, LayoutGrid, ShieldCheck, Plus, ChevronRight, Loader2, KeyRound,
-  Home as HomeIcon, BarChart3, Search,
+  ListChecks, MessageSquare, LayoutGrid, ShieldCheck, Plus, ChevronRight, Loader2,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { StatCard } from "../components/Basics";
 import StackedBarChart from "../components/StackedBarChart";
+import Sidebar from "../components/Sidebar";
 import OverviewPanel from "../components/OverviewPanel";
 import AdminPanel from "../components/AdminPanel";
 import ChatPanel from "../components/ChatPanel";
 import MyTasksPanel from "../components/MyTasksPanel";
 import ChangePasswordModal from "../components/ChangePasswordModal";
+import UpdateProfileModal from "../components/UpdateProfileModal";
 import CompanyStaffPanel from "../components/CompanyStaffPanel";
 
-const DOT_COLORS = ["#3B82F6", "#8B5CF6", "#22C55E", "#CA8A04", "#EF4444", "#06B6D4", "#EC4899"];
-
-export default function Home({ user, onLogout, onOpenProject }) {
+export default function Home({ user, onLogout, onOpenProject, onUserUpdated }) {
   const [projects, setProjects] = useState(null);
   const [overview, setOverview] = useState(null);
   const [staffCount, setStaffCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [sideQuery, setSideQuery] = useState("");
 
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
@@ -34,6 +32,7 @@ export default function Home({ user, onLogout, onOpenProject }) {
   const [myTasksOpen, setMyTasksOpen] = useState(false);
   const [inProgressOpen, setInProgressOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [staffOpen, setStaffOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -80,59 +79,19 @@ export default function Home({ user, onLogout, onOpenProject }) {
     }));
   }, [overview]);
 
-  const sidebarProjects = useMemo(() => {
-    const list = projects || [];
-    const q = sideQuery.trim().toLowerCase();
-    return q ? list.filter(p => p.name.toLowerCase().includes(q)) : list;
-  }, [projects, sideQuery]);
-
   return (
     <div className="app-root home-shell">
-      <aside className="home-sidebar">
-        <div className="home-sidebar-brand">
-          <ShieldCheck size={18} />
-          <span>BAN DỰ ÁN</span>
-        </div>
-        <div className="home-sidebar-sub">TCT Cổ phần Hợp Lực</div>
-
-        <nav className="home-sidebar-nav">
-          <button className="home-sidebar-nav-item home-sidebar-nav-item-active" type="button">
-            <HomeIcon size={15} /> Tổng quan
-          </button>
-          <button className="home-sidebar-nav-item" onClick={() => setMyTasksOpen(true)} type="button">
-            <ListChecks size={15} /> Việc của tôi
-          </button>
-          <button className="home-sidebar-nav-item" onClick={() => setStaffOpen(true)} type="button">
-            <Users2 size={15} /> Nhân viên
-          </button>
-          <button className="home-sidebar-nav-item" onClick={() => setOverviewOpen(true)} type="button">
-            <BarChart3 size={15} /> Báo cáo &amp; KPI
-          </button>
-          {user.isSuperAdmin && (
-            <button className="home-sidebar-nav-item" onClick={() => setAdminOpen(true)} type="button">
-              <ShieldCheck size={15} /> Quản trị hệ thống
-            </button>
-          )}
-        </nav>
-
-        <div className="home-sidebar-search">
-          <Search size={13} />
-          <input type="text" placeholder="Tìm dự án…" value={sideQuery} onChange={e => setSideQuery(e.target.value)} />
-        </div>
-
-        <div className="home-sidebar-section-label">DỰ ÁN {projects ? `(${projects.length})` : ""}</div>
-        <div className="home-sidebar-projects">
-          {(sidebarProjects || []).map((p, i) => (
-            <button key={p.id} className="home-sidebar-project-item" onClick={() => onOpenProject(p.id)} type="button">
-              <span className="home-sidebar-dot" style={{ background: DOT_COLORS[i % DOT_COLORS.length] }} />
-              <span className="home-sidebar-project-name">{p.name}</span>
-            </button>
-          ))}
-        </div>
-        <button className="home-sidebar-add-project" onClick={() => setCreating(true)} type="button">
-          <Plus size={13} /> Dự án mới
-        </button>
-      </aside>
+      <Sidebar
+        user={user}
+        projects={projects}
+        currentProjectId={null}
+        onSelectProject={onOpenProject}
+        onGoHome={() => {}}
+        onOpenMyTasks={() => setMyTasksOpen(true)}
+        onOpenStaff={() => setStaffOpen(true)}
+        onOpenOverview={() => setOverviewOpen(true)}
+        onOpenAdmin={() => setAdminOpen(true)}
+      />
 
       <div className="home-main-col">
         <div className="app-topbar">
@@ -156,8 +115,10 @@ export default function Home({ user, onLogout, onOpenProject }) {
             </div>
             <div className="app-header-right">
               <div className="user-chip">
+                <span className="avatar-circle avatar-clickable avatar-chip" onClick={() => setProfileOpen(true)} title="Thông tin cá nhân">
+                  {(user.name || "?").trim().charAt(0).toUpperCase()}
+                </span>
                 <span>{user.name}</span>
-                <button onClick={() => setPasswordOpen(true)} title="Đổi mật khẩu" type="button"><KeyRound size={13} /></button>
                 <button onClick={onLogout} title="Đăng xuất" type="button"><LogOut size={13} /></button>
               </div>
             </div>
@@ -240,6 +201,14 @@ export default function Home({ user, onLogout, onOpenProject }) {
       {chatOpen && <ChatPanel currentUser={user} projectId={null} projectName="" onClose={() => setChatOpen(false)} />}
       {myTasksOpen && <MyTasksPanel onClose={() => setMyTasksOpen(false)} />}
       {passwordOpen && <ChangePasswordModal onClose={() => setPasswordOpen(false)} />}
+      {profileOpen && (
+        <UpdateProfileModal
+          user={user}
+          onUpdated={(u) => onUserUpdated(u)}
+          onOpenPassword={() => { setProfileOpen(false); setPasswordOpen(true); }}
+          onClose={() => setProfileOpen(false)}
+        />
+      )}
       {staffOpen && <CompanyStaffPanel canManage={canManageStaff} onClose={() => { setStaffOpen(false); load(); }} />}
       {inProgressOpen && (
         <div className="modal-overlay" onClick={() => setInProgressOpen(false)}>

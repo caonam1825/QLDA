@@ -490,6 +490,36 @@ router.patch("/tasks/:taskId/progress", (req, res) => {
   res.json({ project: fullProject(projectId, access.role) });
 });
 
+// Giao tiến độ HÀNG LOẠT cho cả 1 nhóm bước (VD cả mục "I. Chấp thuận chủ
+// trương đầu tư") — áp dụng người phụ trách/trạng thái/hạn cho TẤT CẢ công
+// việc trong nhóm cùng lúc, không phải tích từng dòng bên trong. Việc nào
+// đã bị khoá hạn thì bỏ qua phần hạn của riêng việc đó (không lỗi cả loạt).
+router.patch("/groups/:groupId/bulk-progress", (req, res) => {
+  const projectId = projectIdOfGroup(req.params.groupId);
+  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhóm" });
+  const access = requireProjectAccess(req, res, projectId, "editProgress");
+  if (!access) return;
+  const { status, assigneeStaffId, assignee, due } = req.body || {};
+  const tasks = db.prepare("SELECT * FROM tasks WHERE group_id = ?").all(req.params.groupId);
+  const now = Date.now();
+  const tx = db.transaction(() => {
+    for (const t of tasks) {
+      const sets = [];
+      const vals = [];
+      if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
+      if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
+      if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
+      if (due !== undefined && !t.due_locked) { sets.push("due_date = ?"); vals.push(due); }
+      if (!sets.length) continue;
+      sets.push("updated_by = ?"); vals.push(req.user.id);
+      sets.push("updated_at = ?"); vals.push(now);
+      vals.push(t.id);
+      db.prepare(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+    }
+  });
+  tx();
+  res.json({ project: fullProject(projectId, access.role) });
+});
 // Khoá / mở khoá hạn hoàn thành — chỉ chủ dự án, để hạn đã khoá trở thành
 // căn cứ cố định khi tính KPI (không ai — kể cả chủ dự án qua API thường —
 // sửa được due_date nữa cho đến khi mở khoá lại ở đây).

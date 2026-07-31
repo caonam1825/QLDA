@@ -223,6 +223,20 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   động có quyền cao nhất — toàn quyền trên MỌI dự án (kể cả khoá/mở khoá hạn),
   không phụ thuộc có phải thành viên hay không. Có thể cấp/thu hồi quyền này
   cho người khác trong mục "Quản trị hệ thống" trên header.
+- **Giao tiến độ hàng loạt cho cả nhóm bước**: mỗi nhóm bước lớn (I, II, III…)
+  có nút "Giao tiến độ cho cả nhóm" — chọn trạng thái/người phụ trách/hạn
+  chung rồi áp dụng cho TOÀN BỘ công việc trong nhóm cùng lúc, không cần tích
+  chỉnh từng dòng bên trong.
+- **Thành viên dự án — tích chọn từ nhân viên đã có tài khoản**: mục "Thành
+  viên" trong dự án giờ hiển thị sẵn danh sách nhân viên đã có tài khoản đăng
+  nhập để tích chọn nhanh (kèm chọn quyền), thay vì phải gõ lại số điện thoại
+  — vẫn giữ ô nhập SĐT thủ công cho trường hợp cần thêm người ngoài danh bạ.
+- **Cập nhật thông tin cá nhân**: bấm vào avatar (chữ cái đầu tên) ở góc màn
+  hình để sửa họ tên/email, hoặc đổi mật khẩu ngay từ đó.
+- **Giao diện đồng nhất Trang chủ ↔ từng dự án**: sidebar tối màu tím-navy
+  (Tổng quan, Việc của tôi, Nhân viên, Báo cáo & KPI, Quản trị hệ thống, danh
+  sách dự án có chấm màu) hiển thị giống hệt nhau dù đang ở Trang chủ hay bên
+  trong 1 dự án cụ thể.
 - **Việc của tôi & lọc nhanh**: mỗi nhân viên/quản lý có tài khoản đăng nhập
   thấy ngay nút "Việc của tôi" cùng các lọc nhanh Đang thực hiện / Đã hoàn
   thành / Trễ hạn ngay trên thanh công cụ, không cần dựng lại bộ lọc mỗi lần.

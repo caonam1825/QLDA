@@ -1,20 +1,67 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus, Trash2, Pencil, FolderPlus } from "lucide-react";
-import { toRoman } from "../constants";
+import { ChevronDown, ChevronRight, Plus, Trash2, Pencil, FolderPlus, Users } from "lucide-react";
+import { toRoman, STATUS } from "../constants";
 import { MiniBar, IconBtn, ConfirmButton } from "./Basics";
 import TaskRow from "./TaskRow";
+
+function BulkAssignForm({ group, tasks, staffList, onBulkAssign, onCancel }) {
+  const [status, setStatus] = useState("");
+  const [assigneeStaffId, setAssigneeStaffId] = useState("");
+  const [due, setDue] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function apply() {
+    const patch = {};
+    if (status) patch.status = status;
+    if (assigneeStaffId) { patch.assigneeStaffId = assigneeStaffId; patch.assignee = ""; }
+    if (due) patch.due = due;
+    if (Object.keys(patch).length === 0) { onCancel(); return; }
+    setBusy(true);
+    try {
+      await onBulkAssign(group.id, patch);
+      onCancel();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="bulk-assign-box" onClick={e => e.stopPropagation()}>
+      <div className="bulk-assign-title">
+        Giao tiến độ cho cả nhóm "{group.name}" ({tasks.length} việc) — không cần sửa từng dòng bên trong
+      </div>
+      <div className="bulk-assign-grid">
+        <select value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="">— Giữ nguyên trạng thái —</option>
+          {Object.entries(STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+        <select value={assigneeStaffId} onChange={e => setAssigneeStaffId(e.target.value)}>
+          <option value="">— Giữ nguyên người phụ trách —</option>
+          {staffList.map(s => <option key={s.id} value={s.id}>{s.name}{s.position ? ` (${s.position})` : ""}</option>)}
+        </select>
+        <input type="date" value={due} onChange={e => setDue(e.target.value)} title="Hạn hoàn thành chung (bỏ trống = giữ nguyên)" />
+      </div>
+      <div className="bulk-assign-actions">
+        <button type="button" disabled={busy} onClick={apply}>{busy ? "Đang áp dụng…" : "Áp dụng cho cả nhóm"}</button>
+        <button type="button" className="staff-cancel-edit" onClick={onCancel}>Huỷ</button>
+      </div>
+    </div>
+  );
+}
 
 export function GroupBlock({
   group, roman, tasks, staffList, perms,
   onProgressChange, onFieldChange, onDeleteTask, onMoveTask,
-  onLockDue, onUnlockDue,
+  onLockDue, onUnlockDue, onBulkAssign,
   onRenameGroup, onDeleteGroup, onAddTask, defaultOpen,
 }) {
   const [open, setOpen] = useState(defaultOpen);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(group.name || "");
+  const [bulkOpen, setBulkOpen] = useState(false);
   const done = tasks.filter(t => t.progress.status === "done").length;
   const canManage = !!perms?.addProcess;
+  const canEditProgress = !!perms?.editProgress;
   const canLock = !!perms?.manageLock;
   const hasOverdue = tasks.some(t => {
     const due = t.progress.due;
@@ -44,6 +91,9 @@ export function GroupBlock({
           <span className="group-name" onClick={() => setOpen(o => !o)}>{group.name || "(Nhóm chưa đặt tên)"}</span>
         )}
         <MiniBar done={done} total={tasks.length} />
+        {canEditProgress && tasks.length > 0 && (
+          <IconBtn icon={Users} title="Giao tiến độ cho cả nhóm" onClick={() => { setBulkOpen(o => !o); setOpen(true); }} />
+        )}
         {canManage && (
           <span className="group-actions">
             <IconBtn icon={Pencil} title="Đổi tên nhóm" onClick={() => setEditingName(true)} />
@@ -55,6 +105,9 @@ export function GroupBlock({
           </span>
         )}
       </div>
+      {open && bulkOpen && (
+        <BulkAssignForm group={group} tasks={tasks} staffList={staffList} onBulkAssign={onBulkAssign} onCancel={() => setBulkOpen(false)} />
+      )}
       {open && (
         <div className="group-body">
           {tasks.map((t, i) => (
@@ -87,7 +140,7 @@ export function GroupBlock({
 
 export function PhaseBlock({
   phase, groups, staffList, perms, onProgressChange, onFieldChange, onDeleteTask,
-  onMoveTask, onLockDue, onUnlockDue, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase,
+  onMoveTask, onLockDue, onUnlockDue, onBulkAssign, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase,
 }) {
   const allTasks = groups.flatMap(g => g.tasks);
   const done = allTasks.filter(t => t.progress.status === "done").length;
@@ -121,6 +174,7 @@ export function PhaseBlock({
             onMoveTask={onMoveTask}
             onLockDue={onLockDue}
             onUnlockDue={onUnlockDue}
+            onBulkAssign={onBulkAssign}
             onRenameGroup={onRenameGroup}
             onDeleteGroup={onDeleteGroup}
             onAddTask={onAddTask}

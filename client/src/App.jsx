@@ -32,6 +32,10 @@ export default function App() {
     setActiveProjectId(null);
   }
 
+  function handleUserUpdated(patch) {
+    setUser(u => ({ ...u, ...patch }));
+  }
+
   if (checking) {
     return (
       <div className="app-root app-loading">
@@ -52,7 +56,7 @@ export default function App() {
   // vào chi tiết (giao việc, tiến độ…). Bấm "Trang chủ" trong chi tiết dự án
   // để quay lại đây.
   if (!activeProjectId) {
-    return <Home user={user} onLogout={handleLogout} onOpenProject={setActiveProjectId} />;
+    return <Home user={user} onLogout={handleLogout} onOpenProject={setActiveProjectId} onUserUpdated={handleUserUpdated} />;
   }
 
   return (
@@ -61,6 +65,7 @@ export default function App() {
       onLogout={handleLogout}
       initialProjectId={activeProjectId}
       onBackHome={() => setActiveProjectId(null)}
+      onUserUpdated={handleUserUpdated}
     />
   );
 }

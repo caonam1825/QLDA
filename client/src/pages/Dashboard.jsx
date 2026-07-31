@@ -2,13 +2,14 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
   FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
-  MessageSquare, ListChecks, ArrowLeft, KeyRound,
+  MessageSquare, ListChecks, ArrowLeft,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS, isOverdue } from "../constants";
 import { SealBadge, StatCard } from "../components/Basics";
 import { PhaseBlock } from "../components/GroupPhaseBlocks";
 import ProjectSwitcher from "../components/ProjectSwitcher";
+import Sidebar from "../components/Sidebar";
 import MembersPanel from "../components/MembersPanel";
 import StaffPanel from "../components/StaffPanel";
 import ReportPanel from "../components/ReportPanel";
@@ -17,11 +18,12 @@ import AdminPanel from "../components/AdminPanel";
 import ChatPanel from "../components/ChatPanel";
 import MyTasksPanel from "../components/MyTasksPanel";
 import ChangePasswordModal from "../components/ChangePasswordModal";
+import UpdateProfileModal from "../components/UpdateProfileModal";
 import NextSteps from "../components/NextSteps";
 
 const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
 
-export default function Dashboard({ user, onLogout, initialProjectId, onBackHome }) {
+export default function Dashboard({ user, onLogout, initialProjectId, onBackHome, onUserUpdated }) {
   const [projects, setProjects] = useState([]);
   const [currentId, setCurrentId] = useState(null);
   const [project, setProject] = useState(null);
@@ -42,6 +44,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
   const [chatOpen, setChatOpen] = useState(false);
   const [myTasksOpen, setMyTasksOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [exportingDetail, setExportingDetail] = useState(false);
 
@@ -141,6 +144,8 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
     withSave(async () => (await api.addTask(groupId)).project);
   const handleAddGroup = (phaseKey) =>
     withSave(async () => (await api.addGroup(currentId, phaseKey, "Nhóm bước mới")).project);
+  const handleBulkAssign = (groupId, patch) =>
+    withSave(async () => (await api.bulkUpdateGroupProgress(groupId, patch)).project);
   const handleRenameGroup = (groupId, name) =>
     withSave(async () => (await api.renameGroup(groupId, name)).project);
   const handleDeleteGroup = (groupId) =>
@@ -243,7 +248,19 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
   }
 
   return (
-    <div className="app-root">
+    <div className="app-root home-shell">
+      <Sidebar
+        user={user}
+        projects={projects}
+        currentProjectId={currentId}
+        onSelectProject={handleSwitchProject}
+        onGoHome={onBackHome}
+        onOpenMyTasks={() => setMyTasksOpen(true)}
+        onOpenStaff={() => setStaffOpen(true)}
+        onOpenOverview={() => setOverviewOpen(true)}
+        onOpenAdmin={() => setAdminOpen(true)}
+      />
+      <div className="home-main-col">
       <div className="app-topbar">
         <button className="topbar-btn topbar-btn-home" onClick={onBackHome} type="button">
           <ArrowLeft size={14} /> Trang chủ (tất cả dự án)
@@ -298,8 +315,10 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
           <div className="app-header-right">
             <SealBadge percent={stats.percent} />
             <div className="user-chip">
+              <span className="avatar-circle avatar-clickable avatar-chip" onClick={() => setProfileOpen(true)} title="Thông tin cá nhân">
+                {(user.name || "?").trim().charAt(0).toUpperCase()}
+              </span>
               <span>{user.name}</span>
-              <button onClick={() => setPasswordOpen(true)} title="Đổi mật khẩu" type="button"><KeyRound size={13} /></button>
               <button onClick={onLogout} title="Đăng xuất" type="button"><LogOut size={13} /></button>
             </div>
           </div>
@@ -432,6 +451,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
               onDeleteGroup={handleDeleteGroup}
               onAddTask={handleAddTask}
               onAddGroup={handleAddGroup}
+              onBulkAssign={handleBulkAssign}
               firstPhase={i === 0}
             />
           ))
@@ -441,6 +461,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
           Dữ liệu được lưu trên máy chủ và đồng bộ cho mọi thành viên của dự án theo thời gian thực khi tải lại trang.
         </footer>
       </main>
+      </div>
 
       {membersOpen && (
         <MembersPanel
@@ -482,6 +503,15 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
 
       {passwordOpen && (
         <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
+      )}
+
+      {profileOpen && (
+        <UpdateProfileModal
+          user={user}
+          onUpdated={(u) => onUserUpdated(u)}
+          onOpenPassword={() => { setProfileOpen(false); setPasswordOpen(true); }}
+          onClose={() => setProfileOpen(false)}
+        />
       )}
     </div>
   );

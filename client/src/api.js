@@ -109,6 +109,7 @@ export const api = {
   addTask: (groupId) => request("POST", `/projects/groups/${groupId}/tasks`),
   updateTaskField: (taskId, patch) => request("PATCH", `/projects/tasks/${taskId}`, patch),
   updateProgress: (taskId, patch) => request("PATCH", `/projects/tasks/${taskId}/progress`, patch),
+  bulkUpdateGroupProgress: (groupId, patch) => request("PATCH", `/projects/groups/${groupId}/bulk-progress`, patch),
   moveTask: (taskId, direction) => request("POST", `/projects/tasks/${taskId}/move`, { direction }),
   deleteTask: (taskId) => request("DELETE", `/projects/tasks/${taskId}`),
 };
