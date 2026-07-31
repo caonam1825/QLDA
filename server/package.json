@@ -5,8 +5,9 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
+    "start:litestream": "sh scripts/start-with-litestream.sh",
     "dev": "node src/index.js",
-    "build": "cd ../client && npm install && npm run build"
+    "build": "cd ../client && npm install && npm run build && cd ../server && sh scripts/download-litestream.sh"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

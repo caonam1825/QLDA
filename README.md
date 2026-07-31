@@ -407,3 +407,75 @@ nguồn mới:
 Nếu ai đó chưa thấy bản mới ngay cả sau khi bấm "Tải lại", bảo họ đóng hẳn
 app rồi mở lại 1 lần (một số trình duyệt cần 1 lượt mở lại để service worker
 mới chính thức tiếp quản).
+
+## 13. Chống mất dữ liệu MIỄN PHÍ trên Render (Cloudflare R2 + Litestream)
+
+> **Vì sao cần bước này:** gói Render **miễn phí** không hỗ trợ ổ đĩa bền
+> vững (Disk) — tính năng đó chỉ có ở gói trả phí. Nếu bạn muốn tiếp tục
+> dùng miễn phí, cách sau đây giúp dữ liệu **không bao giờ mất** dù server
+> khởi động lại hay deploy phiên bản mới: mỗi khi có thay đổi, hệ thống tự
+> động sao lưu ngay lập tức lên Cloudflare R2 (lưu trữ đám mây miễn phí,
+> không giới hạn thời gian như Render Postgres free); mỗi khi server khởi
+> động, nó tự động tải lại bản sao lưu mới nhất trước khi chạy.
+>
+> Cách này **không sửa gì trong logic phần mềm** — chỉ thêm bước sao lưu/khôi
+> phục ở ngoài, nên toàn bộ tính năng đã có vẫn hoạt động y như cũ.
+
+### Bước 1 — Tạo bucket Cloudflare R2 (miễn phí)
+
+1. Vào **dash.cloudflare.com** → đăng ký tài khoản miễn phí (nếu chưa có).
+2. Menu bên trái → tìm **R2 Object Storage** → bấm **Create bucket**.
+3. Đặt tên bucket, VD `ban-du-an-backup` → **Location: Automatic** → **Create bucket**.
+4. Vào **R2** → góc phải màn hình → **Manage API tokens** (hoặc **API Tokens**
+   trong mục tài khoản R2) → **Create API token**.
+5. Chọn quyền **Object Read & Write**, phạm vi áp dụng cho đúng bucket vừa
+   tạo → **Create API Token**.
+6. Cloudflare hiện ra 4 thông tin — **copy lại và lưu cẩn thận, chỉ hiện 1
+   lần duy nhất**:
+   - **Access Key ID**
+   - **Secret Access Key**
+   - **Endpoint** (dạng `https://<mã-account>.r2.cloudflarestorage.com`)
+   - Tên bucket (chính là tên bạn đặt ở bước 3)
+
+### Bước 2 — Thêm biến môi trường trên Render
+
+Vào service trên Render → tab **Environment** → **Add Environment Variable**,
+thêm đủ 4 dòng (giá trị lấy từ bước 1):
+
+| Key | Value |
+|---|---|
+| `LITESTREAM_ENDPOINT` | Endpoint R2 (VD `https://xxxx.r2.cloudflarestorage.com`) |
+| `LITESTREAM_BUCKET` | Tên bucket (VD `ban-du-an-backup`) |
+| `LITESTREAM_ACCESS_KEY_ID` | Access Key ID vừa copy |
+| `LITESTREAM_SECRET_ACCESS_KEY` | Secret Access Key vừa copy |
+
+### Bước 3 — Đổi lệnh khởi động (Start Command)
+
+Vào service trên Render → **Settings** → mục **Start Command** → đổi từ
+`npm start` thành:
+```
+npm run start:litestream
+```
+Bấm **Save Changes**.
+
+### Bước 4 — Deploy lại
+
+Vào **Manual Deploy** → **Deploy latest commit**. Xem tab **Logs**, nếu thấy
+dòng `[litestream] Khởi động server, đồng thời tự động sao lưu liên tục lên
+R2…` là đã hoạt động đúng.
+
+> Lần deploy ĐẦU TIÊN sau khi bật tính năng này sẽ bắt đầu với dữ liệu trống
+> (vì chưa có bản sao lưu nào trong R2 trước đó) — đăng ký lại tài khoản 1
+> lần cuối. Từ deploy này trở đi, **mọi thay đổi đều được sao lưu ngay lập
+> tức**, deploy lại bao nhiêu lần cũng không mất dữ liệu nữa.
+
+### Kiểm tra hoạt động đúng
+
+Vào Cloudflare R2 → bucket của bạn → sẽ thấy các file trong thư mục `db/`
+xuất hiện và cập nhật liên tục khi bạn dùng app (thêm dự án, sửa công việc…).
+Nếu thư mục này trống, kiểm tra lại 4 biến môi trường ở Bước 2 có đúng không.
+
+### Nếu không dùng Render free tier (VPS/Docker riêng)
+
+Bỏ qua toàn bộ mục này — nếu bạn tự thuê VPS hoặc chạy Docker với volume
+riêng (mục 3, 4), ổ đĩa đã là bền vững sẵn, không cần Litestream/R2.
