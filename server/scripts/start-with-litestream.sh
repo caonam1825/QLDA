@@ -6,7 +6,11 @@
 set -e
 cd "$(dirname "$0")/.."   # về thư mục server/
 
-DB_PATH="${DB_PATH:-./data/app.db}"
+# QUAN TRỌNG: phải "export" thì tiến trình con (litestream) mới đọc được
+# biến này để thay vào ${DB_PATH} trong litestream.yml. Thiếu export sẽ
+# khiến Litestream hiểu nhầm đường dẫn database (VD hiểu thành thư mục hiện
+# tại), gây lỗi "unable to open database file: is a directory".
+export DB_PATH="${DB_PATH:-$(pwd)/data/app.db}"
 mkdir -p "$(dirname "$DB_PATH")"
 
 if [ -n "$LITESTREAM_BUCKET" ] && [ -f bin/litestream ]; then
