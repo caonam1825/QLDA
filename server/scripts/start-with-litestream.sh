@@ -10,15 +10,20 @@ DB_PATH="${DB_PATH:-./data/app.db}"
 mkdir -p "$(dirname "$DB_PATH")"
 
 if [ -n "$LITESTREAM_BUCKET" ] && [ -f bin/litestream ]; then
-  echo "[litestream] Đang khôi phục dữ liệu mới nhất từ Cloudflare R2 (nếu có)…"
+  echo "[litestream] Đang khôi phục dữ liệu mới nhất từ kho lưu trữ (nếu có)…"
   ./bin/litestream restore -if-replica-exists -config litestream.yml "$DB_PATH" || \
     echo "[litestream] Không có bản sao lưu nào trước đó — bắt đầu với cơ sở dữ liệu mới."
 
-  echo "[litestream] Khởi động server, đồng thời tự động sao lưu liên tục lên R2…"
+  echo "[litestream] Khởi động server, đồng thời tự động sao lưu liên tục…"
   exec ./bin/litestream replicate -config litestream.yml -exec "node src/index.js"
 else
-  echo "[CẢNH BÁO] Chưa cấu hình LITESTREAM_BUCKET (hoặc chưa có bin/litestream) —"
-  echo "server chạy KHÔNG có sao lưu bền vững. Dữ liệu sẽ mất khi deploy lại trên"
-  echo "gói Render miễn phí. Xem README mục 13 để cấu hình Cloudflare R2."
+  if [ -z "$LITESTREAM_BUCKET" ]; then
+    echo "[CẢNH BÁO] Chưa cấu hình biến môi trường LITESTREAM_BUCKET."
+  fi
+  if [ ! -f bin/litestream ]; then
+    echo "[CẢNH BÁO] Không tìm thấy bin/litestream (bước tải lúc build có thể đã lỗi — xem log Build)."
+  fi
+  echo "[CẢNH BÁO] server chạy KHÔNG có sao lưu bền vững. Dữ liệu sẽ mất khi deploy lại trên"
+  echo "gói Render miễn phí. Xem README mục 13 để cấu hình."
   exec node src/index.js
 fi
