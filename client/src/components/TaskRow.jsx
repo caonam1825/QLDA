@@ -1,12 +1,12 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import {
   ChevronDown, ChevronRight, Building2, CalendarDays, AlertTriangle,
   ArrowUp, ArrowDown, Trash2, User, Lock, Unlock,
 } from "lucide-react";
 import { STATUS, isOverdue } from "../constants";
-import { IconBtn, ConfirmButton } from "./Basics";
+import { IconBtn, ConfirmButton, DebouncedInput, DebouncedTextarea } from "./Basics";
 
-export default function TaskRow({
+function TaskRow({
   task, code, staffList, onProgressChange, onFieldChange, onDelete, onMove,
   onLockDue, onUnlockDue, canMoveUp, canMoveDown, perms,
 }) {
@@ -29,6 +29,9 @@ export default function TaskRow({
   const dueLocked = !!entry.dueLocked;
   const dueDisabled = !canEditProgress || dueLocked;
 
+  // Các ô nhập văn bản dùng DebouncedInput/DebouncedTextarea: gõ mượt ngay
+  // lập tức (state cục bộ trong ô), chỉ gọi API lưu sau khi ngừng gõ ~500ms
+  // hoặc khi rời khỏi ô — tránh gọi API + tải lại cả dự án trên từng ký tự.
   return (
     <div className="task-row" style={{ marginLeft: indent ? 22 : 0 }}>
       <div className="task-row-head">
@@ -60,36 +63,36 @@ export default function TaskRow({
         <div className="task-detail">
           <div className="field field-full">
             <span className="field-label">Tên công việc / đầu mục</span>
-            <input
+            <DebouncedInput
               type="text" value={task.title} disabled={!canEditFields}
               placeholder="Nhập tên bước công việc…"
-              onChange={e => onFieldChange(task.id, { title: e.target.value })}
+              onCommit={v => onFieldChange(task.id, { title: v })}
             />
           </div>
 
           <div className="task-detail-grid">
             <label className="field">
               <span className="field-label">Đơn vị thực hiện</span>
-              <input
+              <DebouncedInput
                 type="text" placeholder="VD: Sở Kế hoạch và Đầu tư" disabled={!canEditFields}
                 value={task.unitDo}
-                onChange={e => onFieldChange(task.id, { unitDo: e.target.value })}
+                onCommit={v => onFieldChange(task.id, { unitDo: v })}
               />
             </label>
             <label className="field">
               <span className="field-label">Đơn vị phối hợp / trình</span>
-              <input
+              <DebouncedInput
                 type="text" placeholder="VD: Các sở, ngành liên quan" disabled={!canEditFields}
                 value={task.unitCoord}
-                onChange={e => onFieldChange(task.id, { unitCoord: e.target.value })}
+                onCommit={v => onFieldChange(task.id, { unitCoord: v })}
               />
             </label>
             <label className="field">
               <span className="field-label">Thời gian dự kiến</span>
-              <input
+              <DebouncedInput
                 type="text" placeholder="VD: 10 ngày" disabled={!canEditFields}
                 value={task.duration}
-                onChange={e => onFieldChange(task.id, { duration: e.target.value })}
+                onCommit={v => onFieldChange(task.id, { duration: v })}
               />
             </label>
           </div>
@@ -120,11 +123,11 @@ export default function TaskRow({
                 <option value="__custom__">Khác (nhập tay)…</option>
               </select>
               {usingCustomName && (
-                <input
+                <DebouncedInput
                   type="text" disabled={!canEditProgress}
                   placeholder="Nhập tên người phụ trách…"
                   value={entry.assignee}
-                  onChange={e => onProgressChange(task.id, { assignee: e.target.value })}
+                  onCommit={v => onProgressChange(task.id, { assignee: v })}
                   style={{ marginTop: 4 }}
                 />
               )}
@@ -155,30 +158,30 @@ export default function TaskRow({
 
           <label className="field field-full">
             <span className="field-label">Căn cứ pháp lý</span>
-            <input
+            <DebouncedInput
               type="text" placeholder="VD: Điều 31 Nghị định số 31/2021/NĐ-CP" disabled={!canEditFields}
               value={task.legal}
-              onChange={e => onFieldChange(task.id, { legal: e.target.value })}
+              onCommit={v => onFieldChange(task.id, { legal: v })}
             />
           </label>
 
           <label className="field field-full">
             <span className="field-label">Ghi chú quy trình</span>
-            <textarea
+            <DebouncedTextarea
               rows={2} disabled={!canEditFields}
               placeholder="VD: mốc thời gian rút gọn, điều kiện áp dụng…"
               value={task.origNote}
-              onChange={e => onFieldChange(task.id, { origNote: e.target.value })}
+              onCommit={v => onFieldChange(task.id, { origNote: v })}
             />
           </label>
 
           <label className="field field-full field-note">
             <span className="field-label">Ghi chú thực tế / cập nhật tiến độ</span>
-            <textarea
+            <DebouncedTextarea
               rows={2} disabled={!canEditProgress}
               placeholder="Ghi chú riêng cho công việc này…"
               value={entry.note}
-              onChange={e => onProgressChange(task.id, { note: e.target.value })}
+              onCommit={v => onProgressChange(task.id, { note: v })}
             />
           </label>
         </div>
@@ -186,3 +189,19 @@ export default function TaskRow({
     </div>
   );
 }
+
+// So sánh nông (shallow) đủ dùng: task/entry là object mới mỗi lần cha
+// render lại toàn bộ dự án, nhưng nếu nội dung con TASK NÀY không đổi thì bỏ
+// qua render lại — giảm hẳn số dòng phải vẽ lại khi chỉ 1 công việc thay đổi.
+function areEqual(prev, next) {
+  return (
+    JSON.stringify(prev.task) === JSON.stringify(next.task) &&
+    prev.code === next.code &&
+    prev.canMoveUp === next.canMoveUp &&
+    prev.canMoveDown === next.canMoveDown &&
+    prev.perms === next.perms &&
+    prev.staffList === next.staffList
+  );
+}
+
+export default memo(TaskRow, areEqual);

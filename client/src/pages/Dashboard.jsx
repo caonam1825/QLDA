@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
   FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
@@ -83,11 +83,23 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
     setTimeout(() => setSaveState("idle"), 900);
   }
 
+  // Trước đây mỗi thao tác gọi API sửa xong lại gọi thêm GET /project để tải
+  // lại toàn bộ dự án — tức là 2 lượt round-trip mạng cho MỖI lần sửa, và
+  // render lại toàn bộ danh sách công việc 2 lần liên tiếp → giật/lag rõ rệt
+  // khi thêm/xoá bước. Mọi API sửa đổi đã trả sẵn dự án mới nhất trong cùng
+  // response — dùng luôn kết quả đó, không gọi lại API lần 2 nữa.
+  // mutationSeqRef chống trường hợp bấm nhanh liên tiếp: chỉ áp dụng kết quả
+  // của lần gọi MỚI NHẤT, bỏ qua phản hồi đến muộn của các lần gọi cũ hơn.
+  const mutationSeqRef = useRef(0);
   async function withSave(fn) {
+    const seq = ++mutationSeqRef.current;
     setSaveState("saving");
     try {
-      await fn();
-      flashSaved();
+      const proj = await fn();
+      if (seq === mutationSeqRef.current) {
+        setProject(proj);
+        flashSaved();
+      }
     } catch (e) {
       setSaveState("error");
       setError(e.message || "Có lỗi xảy ra");
@@ -116,25 +128,25 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
   };
 
   const handleProgressChange = (taskId, patch) =>
-    withSave(async () => { await api.updateProgress(taskId, patch); await refreshProject(); });
+    withSave(async () => (await api.updateProgress(taskId, patch)).project);
   const handleFieldChange = (taskId, patch) =>
-    withSave(async () => { await api.updateTaskField(taskId, patch); await refreshProject(); });
+    withSave(async () => (await api.updateTaskField(taskId, patch)).project);
   const handleDeleteTask = (taskId) =>
-    withSave(async () => { await api.deleteTask(taskId); await refreshProject(); });
+    withSave(async () => (await api.deleteTask(taskId)).project);
   const handleMoveTask = (taskId, dir) =>
-    withSave(async () => { await api.moveTask(taskId, dir); await refreshProject(); });
+    withSave(async () => (await api.moveTask(taskId, dir)).project);
   const handleAddTask = (groupId) =>
-    withSave(async () => { await api.addTask(groupId); await refreshProject(); });
+    withSave(async () => (await api.addTask(groupId)).project);
   const handleAddGroup = (phaseKey) =>
-    withSave(async () => { await api.addGroup(currentId, phaseKey, "Nhóm bước mới"); await refreshProject(); });
+    withSave(async () => (await api.addGroup(currentId, phaseKey, "Nhóm bước mới")).project);
   const handleRenameGroup = (groupId, name) =>
-    withSave(async () => { await api.renameGroup(groupId, name); await refreshProject(); });
+    withSave(async () => (await api.renameGroup(groupId, name)).project);
   const handleDeleteGroup = (groupId) =>
-    withSave(async () => { await api.deleteGroup(groupId); await refreshProject(); });
+    withSave(async () => (await api.deleteGroup(groupId)).project);
   const handleLockDue = (taskId) =>
-    withSave(async () => { await api.lockTaskDue(taskId); await refreshProject(); });
+    withSave(async () => (await api.lockTaskDue(taskId)).project);
   const handleUnlockDue = (taskId) =>
-    withSave(async () => { await api.unlockTaskDue(taskId); await refreshProject(); });
+    withSave(async () => (await api.unlockTaskDue(taskId)).project);
 
   async function handleExportDetail() {
     setExportingDetail(true);

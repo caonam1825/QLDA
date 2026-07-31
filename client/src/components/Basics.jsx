@@ -1,4 +1,55 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+
+// Gõ phím mượt mà: cập nhật giao diện ngay lập tức (state cục bộ), nhưng chỉ
+// gọi API lưu (onCommit) sau khi người dùng ngừng gõ ~500ms, hoặc khi rời
+// khỏi ô nhập (blur) — thay vì gọi API + tải lại toàn bộ dự án trên MỖI ký
+// tự gõ, vốn là nguyên nhân chính gây giật/lag khi sửa nội dung công việc.
+function useDebouncedField(value, onCommit, delay = 500) {
+  const [local, setLocal] = useState(value ?? "");
+  const timerRef = useRef(null);
+  const lastCommittedRef = useRef(value ?? "");
+
+  useEffect(() => {
+    // Chỉ đồng bộ lại từ props khi giá trị ngoài thay đổi mà KHÔNG phải do
+    // chính lần commit gần nhất của mình gây ra (tránh giật con trỏ khi gõ).
+    if (value !== lastCommittedRef.current) {
+      setLocal(value ?? "");
+      lastCommittedRef.current = value ?? "";
+    }
+  }, [value]);
+
+  function commit(v) {
+    clearTimeout(timerRef.current);
+    if (v === lastCommittedRef.current) return;
+    lastCommittedRef.current = v;
+    onCommit(v);
+  }
+
+  function handleChange(e) {
+    const v = e.target.value;
+    setLocal(v);
+    clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => commit(v), delay);
+  }
+
+  function handleBlur() {
+    commit(local);
+  }
+
+  useEffect(() => () => clearTimeout(timerRef.current), []);
+
+  return { local, handleChange, handleBlur };
+}
+
+export function DebouncedInput({ value, onCommit, delay, ...rest }) {
+  const { local, handleChange, handleBlur } = useDebouncedField(value, onCommit, delay);
+  return <input {...rest} value={local} onChange={handleChange} onBlur={handleBlur} />;
+}
+
+export function DebouncedTextarea({ value, onCommit, delay, ...rest }) {
+  const { local, handleChange, handleBlur } = useDebouncedField(value, onCommit, delay);
+  return <textarea {...rest} value={local} onChange={handleChange} onBlur={handleBlur} />;
+}
 
 export function SealBadge({ percent }) {
   return (

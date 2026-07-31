@@ -17,6 +17,27 @@
   --shadow-sm: 0 1px 2px rgba(30, 41, 59, 0.06), 0 1px 3px rgba(30, 41, 59, 0.08);
   --shadow-md: 0 4px 12px rgba(30, 41, 59, 0.08), 0 2px 4px rgba(30, 41, 59, 0.06);
   --radius: 10px;
+
+  /* Bảng màu sidebar/header tối theo giao diện tham khảo (tím → navy) */
+  --side-bg-1: #2A1E52;
+  --side-bg-2: #1C2B4A;
+  --side-text: #E7E2F5;
+  --side-text-dim: #A79BC9;
+  --side-line: rgba(255,255,255,0.08);
+  --side-hover: rgba(255,255,255,0.08);
+  --side-active: rgba(255,255,255,0.14);
+
+  /* Màu chú giải trạng thái công việc, đồng bộ với biểu đồ & tag */
+  --stat-green: #22C55E;
+  --stat-green-soft: #DCFCE7;
+  --stat-yellow: #CA8A04;
+  --stat-yellow-soft: #FEF3C7;
+  --stat-blue: #3B82F6;
+  --stat-blue-soft: #DBEAFE;
+  --stat-purple: #8B5CF6;
+  --stat-purple-soft: #EDE9FE;
+  --stat-red: #EF4444;
+  --stat-red-soft: #FEE2E2;
 }
 
 * { box-sizing: border-box; }

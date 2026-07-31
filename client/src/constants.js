@@ -8,10 +8,10 @@ export const PHASES = [
 ];
 
 export const STATUS = {
-  todo: { label: "Chưa bắt đầu", color: "#5B6472", bg: "#EEECE3", icon: Circle },
-  doing: { label: "Đang thực hiện", color: "#A9832E", bg: "#F6EFDD", icon: Clock3 },
-  done: { label: "Hoàn thành", color: "#2F6D5D", bg: "#E4EFEA", icon: CheckCircle2 },
-  blocked: { label: "Tạm dừng / Vướng mắc", color: "#9E2B25", bg: "#F5E4E2", icon: PauseCircle },
+  todo: { label: "Chưa bắt đầu", color: "#64748B", bg: "#F1F5F9", icon: Circle },
+  doing: { label: "Đang thực hiện", color: "#3B82F6", bg: "#DBEAFE", icon: Clock3 },
+  done: { label: "Hoàn thành", color: "#22C55E", bg: "#DCFCE7", icon: CheckCircle2 },
+  blocked: { label: "Tạm dừng / Vướng mắc", color: "#8B5CF6", bg: "#EDE9FE", icon: PauseCircle },
 };
 
 export const ROLE_OPTIONS = [

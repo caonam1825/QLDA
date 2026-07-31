@@ -241,6 +241,15 @@ khoản. Nếu hệ thống của bạn còn ít người dùng, cách đơn gi�
 
 ## 8. Giới hạn cần biết
 
+> **Bản vá hiệu năng (giảm giật/lag khi thêm/xoá bước, gõ chỉnh sửa):**
+> trước đây mỗi thao tác sửa (kể cả gõ từng ký tự vào ô tên công việc) đều
+> gọi API lưu rồi gọi thêm 1 lần API tải lại TOÀN BỘ dự án — tức 2 lượt gọi
+> mạng + vẽ lại toàn bộ danh sách công việc cho mỗi thao tác. Đã sửa: (1) dùng
+> luôn dữ liệu dự án mới nhất mà API lưu đã trả về, bỏ lượt gọi thừa; (2) các
+> ô nhập văn bản (tên việc, đơn vị, căn cứ pháp lý, ghi chú…) gõ mượt tại chỗ,
+> chỉ gửi lên server sau khi ngừng gõ khoảng nửa giây; (3) chỉ vẽ lại đúng
+> dòng công việc thực sự thay đổi thay vì cả trăm dòng mỗi lần sửa 1 dòng.
+
 - Ứng dụng **chưa** đồng bộ theo thời gian thực kiểu Google Docs (không dùng
   WebSocket) — mỗi người cần bấm "Tải lại" hoặc thao tác để lấy dữ liệu mới
   nhất người khác vừa cập nhật.
