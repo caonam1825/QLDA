@@ -1,3 +1,4 @@
+# ---- Stage 1: build frontend ----
 FROM node:20-alpine AS client-build
 WORKDIR /app/client
 COPY client/package.json ./
