@@ -22,6 +22,24 @@ function isSuperAdmin(userId) {
   return !!(row && row.is_super_admin);
 }
 
+// Nhân viên giờ là danh bạ DÙNG CHUNG toàn công ty (không thuộc riêng 1 dự
+// án) — quyền thêm/sửa/xoá hồ sơ nhân viên ở cấp Trang chủ dựa trên: có quản
+// lý (quyền "manageStaff") ít nhất 1 dự án nào đó trong hệ thống, hoặc là
+// Quản trị hệ thống.
+function userManagesAnyProject(userId) {
+  if (isSuperAdmin(userId)) return true;
+  const rows = db.prepare("SELECT role FROM project_members WHERE user_id = ?").all(userId);
+  return rows.some(r => permsFor(r.role).manageStaff);
+}
+
+function requireCompanyStaffAccess(req, res) {
+  if (!userManagesAnyProject(req.user.id)) {
+    res.status(403).json({ error: "Bạn cần quản lý ít nhất 1 dự án để thêm/sửa nhân viên trong danh bạ chung" });
+    return false;
+  }
+  return true;
+}
+
 // Bất kỳ ai đã đăng nhập cũng XEM được mọi dự án trong hệ thống (để các
 // thành viên có thể theo dõi tiến độ dự án khác), nhưng chỉ những quyền cụ
 // thể (`need`) mới cần đúng vai trò trong project_members. `need` là một
@@ -62,6 +80,12 @@ function projectIdOfGroup(groupId) {
 function projectIdOfTask(taskId) {
   const row = db.prepare("SELECT project_id FROM tasks WHERE id = ?").get(taskId);
   return row ? row.project_id : null;
+}
+
+// Công việc coi là "trễ hạn": có hạn, chưa hoàn thành, và hạn đã qua hôm nay.
+function isTaskOverdue(t) {
+  if (!t || !t.due_date || t.status === "done") return false;
+  return t.due_date < new Date().toISOString().slice(0, 10);
 }
 
 function serializeGroup(g) {
@@ -215,6 +239,53 @@ router.post("/", (req, res) => {
 // tích chọn (checkbox) cho mọi dự án, không cần nhập lại số điện thoại mỗi
 // lần. Đặt route này TRƯỚC "GET /:id" để tránh Express hiểu nhầm
 // "staff-directory" là :id.
+// Thêm nhân viên mới NGAY TỪ TRANG CHỦ — không cần gắn với 1 dự án cụ thể.
+// Sau khi tạo, vào từng dự án chỉ cần TÍCH CHỌN người này (PUT
+// "/:id/staff-selection"), không cần nhập lại thông tin.
+router.post("/staff-directory", (req, res) => {
+  if (!requireCompanyStaffAccess(req, res)) return;
+  const {
+    name, position, department, email, phone,
+    grantLogin, loginPhone, loginPassword, linkExistingPhone,
+  } = req.body || {};
+  if (!name || !name.trim()) return res.status(400).json({ error: "Thiếu tên nhân viên" });
+
+  let linkedUserId = "";
+  if (linkExistingPhone) {
+    const user = db.prepare("SELECT * FROM users WHERE phone = ?").get(normalizePhone(linkExistingPhone));
+    if (!user) {
+      return res.status(404).json({ error: "Không tìm thấy tài khoản nào đã đăng ký với số điện thoại này." });
+    }
+    linkedUserId = user.id;
+  } else if (grantLogin) {
+    const rawPhone = loginPhone || phone;
+    if (!rawPhone || !isValidVNPhone(rawPhone)) {
+      return res.status(400).json({ error: "Số điện thoại cấp tài khoản không hợp lệ" });
+    }
+    if (!loginPassword || loginPassword.length < 6) {
+      return res.status(400).json({ error: "Mật khẩu cấp cho nhân viên cần tối thiểu 6 ký tự" });
+    }
+    const normalizedPhone = normalizePhone(rawPhone);
+    let user = db.prepare("SELECT * FROM users WHERE phone = ?").get(normalizedPhone);
+    if (!user) {
+      const uid = nanoid();
+      db.prepare(
+        "INSERT INTO users (id, phone, email, password_hash, name, created_at) VALUES (?,?,?,?,?,?)"
+      ).run(uid, normalizedPhone, (email && email.trim()) || null, hashPassword(loginPassword), name.trim(), Date.now());
+      user = { id: uid };
+    }
+    linkedUserId = user.id;
+  }
+
+  const sid = nanoid();
+  db.prepare(
+    `INSERT INTO staff (id, project_id, name, position, department, email, phone, linked_user_id, created_at)
+     VALUES (?,?,?,?,?,?,?,?,?)`
+  ).run(sid, null, name.trim(), position || "", department || "", email || "", phone || "", linkedUserId, Date.now());
+  const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(sid);
+  res.json({ staff: { ...serializeStaff(staff), projectIds: [] } });
+});
+
 router.get("/staff-directory", (req, res) => {
   const rows = db.prepare("SELECT * FROM staff ORDER BY created_at ASC").all().map(serializeStaff);
   // Kèm luôn danh sách project_id mà mỗi người đang được tích chọn, để giao
@@ -340,6 +411,14 @@ router.delete("/groups/:groupId", (req, res) => {
   if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhóm" });
   const access = requireProjectAccess(req, res, projectId, "addProcess");
   if (!access) return;
+  if (access.role !== "owner") {
+    const tasksInGroup = db.prepare("SELECT * FROM tasks WHERE group_id = ?").all(req.params.groupId);
+    if (tasksInGroup.some(isTaskOverdue)) {
+      return res.status(403).json({
+        error: "Nhóm này có công việc đã trễ hạn — chỉ Chủ dự án mới được xoá cả nhóm, để giữ đúng dữ liệu làm căn cứ họp/KPI.",
+      });
+    }
+  }
   db.prepare("DELETE FROM groups_ WHERE id = ?").run(req.params.groupId);
   res.json({ project: fullProject(projectId, access.role) });
 });
@@ -465,6 +544,15 @@ router.delete("/tasks/:taskId", (req, res) => {
   if (!projectId) return res.status(404).json({ error: "Không tìm thấy công việc" });
   const access = requireProjectAccess(req, res, projectId, "addProcess");
   if (!access) return;
+  const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(req.params.taskId);
+  // Công việc đã trễ hạn: chỉ Chủ dự án / Quản trị hệ thống được xoá — để
+  // nhân viên không thể xoá bỏ bằng chứng trễ hạn trước khi họp / tính KPI.
+  // (access.role đã là "owner" nếu người thao tác là super admin.)
+  if (isTaskOverdue(task) && access.role !== "owner") {
+    return res.status(403).json({
+      error: "Công việc này đã trễ hạn — chỉ Chủ dự án mới được xoá, để giữ đúng dữ liệu làm căn cứ họp/KPI. Hãy báo Chủ dự án nếu cần xoá.",
+    });
+  }
   db.prepare("DELETE FROM tasks WHERE id = ?").run(req.params.taskId);
   res.json({ project: fullProject(projectId, access.role) });
 });
@@ -590,14 +678,11 @@ router.delete("/:id/staff/:staffId", (req, res) => {
   res.json({ project: fullProject(req.params.id, access.role) });
 });
 
-// Xoá VĨNH VIỄN 1 người khỏi toàn bộ danh bạ công ty (mọi dự án). Chỉ cho
-// phép nếu người thao tác quản lý được dự án gốc đã tạo ra hồ sơ này, hoặc
-// là Quản trị hệ thống — để tránh ai cũng xoá được hồ sơ người khác.
+// Xoá VĨNH VIỄN 1 người khỏi toàn bộ danh bạ công ty (mọi dự án).
 router.delete("/staff-directory/:staffId", (req, res) => {
-  const projectId = projectIdOfStaff(req.params.staffId);
-  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
-  const access = requireProjectAccess(req, res, projectId, "manageStaff");
-  if (!access) return;
+  if (!requireCompanyStaffAccess(req, res)) return;
+  const staff = db.prepare("SELECT id FROM staff WHERE id = ?").get(req.params.staffId);
+  if (!staff) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
   const tx = db.transaction(() => {
     db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE assignee_staff_id = ?").run(req.params.staffId);
     db.prepare("DELETE FROM project_staff WHERE staff_id = ?").run(req.params.staffId);
@@ -608,10 +693,9 @@ router.delete("/staff-directory/:staffId", (req, res) => {
 });
 
 router.patch("/staff/:staffId", (req, res) => {
-  const projectId = projectIdOfStaff(req.params.staffId);
-  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
-  const access = requireProjectAccess(req, res, projectId, "manageStaff");
-  if (!access) return;
+  if (!requireCompanyStaffAccess(req, res)) return;
+  const existing = db.prepare("SELECT id FROM staff WHERE id = ?").get(req.params.staffId);
+  if (!existing) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
   const allowed = ["name", "position", "department", "email", "phone"];
   const sets = [];
   const vals = [];
@@ -625,7 +709,8 @@ router.patch("/staff/:staffId", (req, res) => {
     vals.push(req.params.staffId);
     db.prepare(`UPDATE staff SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
   }
-  res.json({ project: fullProject(projectId, access.role) });
+  const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(req.params.staffId);
+  res.json({ staff: serializeStaff(staff) });
 });
 
 /* ---------------- liên kết Zalo cho nhân viên (nhắc việc) ---------------- */
@@ -633,11 +718,9 @@ router.patch("/staff/:staffId", (req, res) => {
 // Sinh (hoặc lấy lại) mã liên kết 6 ký tự — nhân viên nhắn mã này cho Zalo OA
 // của công ty để hệ thống tự động khớp zalo_id với đúng nhân viên.
 router.post("/staff/:staffId/zalo-code", (req, res) => {
-  const projectId = projectIdOfStaff(req.params.staffId);
-  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
-  const access = requireProjectAccess(req, res, projectId, "manageStaff");
-  if (!access) return;
+  if (!requireCompanyStaffAccess(req, res)) return;
   const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(req.params.staffId);
+  if (!staff) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
   let code = staff.zalo_link_code;
   if (!code) {
     code = Math.random().toString(36).slice(2, 8).toUpperCase();
@@ -647,12 +730,11 @@ router.post("/staff/:staffId/zalo-code", (req, res) => {
 });
 
 router.delete("/staff/:staffId/zalo-link", (req, res) => {
-  const projectId = projectIdOfStaff(req.params.staffId);
-  if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
-  const access = requireProjectAccess(req, res, projectId, "manageStaff");
-  if (!access) return;
+  if (!requireCompanyStaffAccess(req, res)) return;
+  const staff = db.prepare("SELECT id FROM staff WHERE id = ?").get(req.params.staffId);
+  if (!staff) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
   db.prepare("UPDATE staff SET zalo_id = '', zalo_link_code = '' WHERE id = ?").run(req.params.staffId);
-  res.json({ project: fullProject(projectId, access.role) });
+  res.json({ ok: true });
 });
 
 /* ---------------- báo cáo ngày / tuần ---------------- */

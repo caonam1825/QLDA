@@ -109,13 +109,21 @@ export function IconBtn({ icon: Icon, onClick, title, danger, disabled }) {
 }
 
 /* Two-step inline confirm, avoids native confirm() dialogs */
-export function ConfirmButton({ icon: Icon, title, confirmLabel, onConfirm, danger }) {
+export function ConfirmButton({ icon: Icon, title, confirmLabel, onConfirm, danger, disabled }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
     const t = setTimeout(() => setArmed(false), 3000);
     return () => clearTimeout(t);
   }, [armed]);
+
+  if (disabled) {
+    return (
+      <button className="icon-btn" title={title} type="button" disabled>
+        <Icon size={13} />
+      </button>
+    );
+  }
 
   if (armed) {
     return (

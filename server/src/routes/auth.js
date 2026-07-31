@@ -70,4 +70,23 @@ router.patch("/me", requireAuth, (req, res) => {
   res.json({ user: { ...row, email: row.email || "", isSuperAdmin: !!row.is_super_admin } });
 });
 
+// Đổi mật khẩu tự đặt (cần đúng mật khẩu hiện tại). Quản trị hệ thống muốn
+// đặt lại mật khẩu HỘ người khác (quên mật khẩu) thì dùng
+// PATCH /admin/users/:id/reset-password bên dưới thay vì API này.
+router.post("/change-password", requireAuth, (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "Vui lòng nhập đủ mật khẩu hiện tại và mật khẩu mới" });
+  }
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: "Mật khẩu mới cần tối thiểu 6 ký tự" });
+  }
+  const row = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+  if (!row || !checkPassword(currentPassword, row.password_hash)) {
+    return res.status(401).json({ error: "Mật khẩu hiện tại không đúng" });
+  }
+  db.prepare("UPDATE users SET password_hash = ? WHERE id = ?").run(hashPassword(newPassword), req.user.id);
+  res.json({ ok: true });
+});
+
 module.exports = router;

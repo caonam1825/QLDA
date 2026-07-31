@@ -1,11 +1,15 @@
 import { useState, useEffect } from "react";
-import { ShieldCheck, X } from "lucide-react";
+import { ShieldCheck, X, KeyRound } from "lucide-react";
 import { api } from "../api";
 
 export default function AdminPanel({ currentUserId, onClose }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [resetFor, setResetFor] = useState(null); // user object
+  const [newPassword, setNewPassword] = useState("");
+  const [resetDone, setResetDone] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   function load() {
     setLoading(true);
@@ -26,6 +30,27 @@ export default function AdminPanel({ currentUserId, onClose }) {
     }
   }
 
+  function openReset(u) {
+    setResetFor(u);
+    setNewPassword("");
+    setResetDone(false);
+    setError("");
+  }
+
+  async function handleReset(e) {
+    e.preventDefault();
+    if (newPassword.length < 6) { setError("Mật khẩu mới cần tối thiểu 6 ký tự"); return; }
+    setBusy(true);
+    try {
+      await api.adminResetPassword(resetFor.id, newPassword);
+      setResetDone(true);
+    } catch (err) {
+      setError(err.message || "Không đặt lại được mật khẩu");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-card" onClick={e => e.stopPropagation()}>
@@ -40,9 +65,9 @@ export default function AdminPanel({ currentUserId, onClose }) {
         </p>
 
         {loading && <p className="invite-hint">Đang tải…</p>}
-        {error && <div className="auth-error">{error}</div>}
+        {error && !resetFor && <div className="auth-error">{error}</div>}
 
-        {!loading && (
+        {!loading && !resetFor && (
           <div className="members-list">
             {users.map(u => (
               <div key={u.id} className="member-row">
@@ -55,6 +80,9 @@ export default function AdminPanel({ currentUserId, onClose }) {
                 ) : (
                   <span className="zalo-status zalo-status-off">Người dùng thường</span>
                 )}
+                <button className="icon-btn" title="Đặt lại mật khẩu (khi họ quên)" onClick={() => openReset(u)} type="button">
+                  <KeyRound size={13} />
+                </button>
                 <button
                   className="icon-btn"
                   onClick={() => toggle(u)}
@@ -66,6 +94,32 @@ export default function AdminPanel({ currentUserId, onClose }) {
                 </button>
               </div>
             ))}
+          </div>
+        )}
+
+        {resetFor && (
+          <div>
+            <h4 className="report-section-title">Đặt lại mật khẩu cho {resetFor.name}</h4>
+            {resetDone ? (
+              <>
+                <p className="invite-hint">Đã đặt lại mật khẩu. Báo mật khẩu mới này cho {resetFor.name} để họ đăng nhập lại.</p>
+                <div className="staff-form-actions">
+                  <button type="button" onClick={() => setResetFor(null)}>Xong</button>
+                </div>
+              </>
+            ) : (
+              <form className="staff-form" onSubmit={handleReset}>
+                <label className="field field-full">
+                  <span className="field-label">Mật khẩu mới (tối thiểu 6 ký tự)</span>
+                  <input type="text" required minLength={6} autoFocus value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                </label>
+                {error && <div className="auth-error">{error}</div>}
+                <div className="staff-form-actions">
+                  <button type="submit" disabled={busy}>{busy ? "Đang lưu…" : "Đặt lại mật khẩu"}</button>
+                  <button type="button" className="staff-cancel-edit" onClick={() => setResetFor(null)}>Huỷ</button>
+                </div>
+              </form>
+            )}
           </div>
         )}
       </div>

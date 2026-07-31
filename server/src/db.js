@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- thêm người vào dự án mới — chỉ cần tích chọn từ danh bạ đã có sẵn.
 CREATE TABLE IF NOT EXISTS staff (
   id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
   position TEXT NOT NULL DEFAULT '',
   department TEXT NOT NULL DEFAULT '',
@@ -147,6 +147,35 @@ if (!staffCols.includes("zalo_link_code")) {
 }
 if (!staffCols.includes("linked_user_id")) {
   db.exec("ALTER TABLE staff ADD COLUMN linked_user_id TEXT NOT NULL DEFAULT ''");
+}
+
+// Migration: databases created before "thêm nhân viên ở Trang chủ" existed
+// had staff.project_id as NOT NULL. SQLite can't relax NOT NULL via ALTER,
+// so rebuild the table when needed (dữ liệu cũ được giữ nguyên project_id).
+// Tạo bảng mới rồi đổi tên (thay vì đổi tên bảng cũ trước) để tránh SQLite
+// tự sửa định nghĩa khoá ngoại của project_staff trỏ nhầm sang bảng tạm.
+const staffProjectIdInfo = db.prepare("PRAGMA table_info(staff)").all().find((c) => c.name === "project_id");
+if (staffProjectIdInfo && staffProjectIdInfo.notnull) {
+  db.pragma("foreign_keys = OFF");
+  db.exec(`
+    CREATE TABLE staff_new (
+      id TEXT PRIMARY KEY,
+      project_id TEXT REFERENCES projects(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      position TEXT NOT NULL DEFAULT '',
+      department TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL DEFAULT '',
+      phone TEXT NOT NULL DEFAULT '',
+      zalo_id TEXT NOT NULL DEFAULT '',
+      zalo_link_code TEXT NOT NULL DEFAULT '',
+      linked_user_id TEXT NOT NULL DEFAULT '',
+      created_at INTEGER NOT NULL
+    );
+    INSERT INTO staff_new SELECT * FROM staff;
+    DROP TABLE staff;
+    ALTER TABLE staff_new RENAME TO staff;
+  `);
+  db.pragma("foreign_keys = ON");
 }
 
 // Safe migration for databases created before due-date locking existed.

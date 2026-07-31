@@ -15,6 +15,11 @@ export function GroupBlock({
   const [nameDraft, setNameDraft] = useState(group.name || "");
   const done = tasks.filter(t => t.progress.status === "done").length;
   const canManage = !!perms?.addProcess;
+  const canLock = !!perms?.manageLock;
+  const hasOverdue = tasks.some(t => {
+    const due = t.progress.due;
+    return due && t.progress.status !== "done" && due < new Date().toISOString().slice(0, 10);
+  });
 
   return (
     <div className="group-block">
@@ -42,7 +47,11 @@ export function GroupBlock({
         {canManage && (
           <span className="group-actions">
             <IconBtn icon={Pencil} title="Đổi tên nhóm" onClick={() => setEditingName(true)} />
-            <ConfirmButton icon={Trash2} title="Xoá cả nhóm" confirmLabel="Xoá nhóm?" danger onConfirm={() => onDeleteGroup(group.id)} />
+            <ConfirmButton
+              icon={Trash2} title={hasOverdue && !canLock ? "Nhóm có việc trễ hạn — chỉ Chủ dự án được xoá" : "Xoá cả nhóm"}
+              confirmLabel="Xoá nhóm?" danger onConfirm={() => onDeleteGroup(group.id)}
+              disabled={hasOverdue && !canLock}
+            />
           </span>
         )}
       </div>

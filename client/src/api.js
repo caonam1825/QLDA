@@ -36,6 +36,9 @@ export const api = {
   login: (phone, password) => request("POST", "/auth/login", { phone, password }),
   me: () => request("GET", "/auth/me"),
   updateMe: (patch) => request("PATCH", "/auth/me", patch),
+  changePassword: (currentPassword, newPassword) => request("POST", "/auth/change-password", { currentPassword, newPassword }),
+
+  adminResetPassword: (userId, newPassword) => request("POST", `/admin/users/${userId}/reset-password`, { newPassword }),
 
   listProjects: () => request("GET", "/projects"),
   createProject: (name, seed) => request("POST", "/projects", { name, seed }),
@@ -48,6 +51,7 @@ export const api = {
   removeMember: (id, userId) => request("DELETE", `/projects/${id}/members/${userId}`),
 
   addStaff: (projectId, data) => request("POST", `/projects/${projectId}/staff`, data),
+  createCompanyStaff: (data) => request("POST", "/projects/staff-directory", data),
   getStaffDirectory: () => request("GET", "/projects/staff-directory"),
   setStaffSelection: (projectId, staffIds) => request("PUT", `/projects/${projectId}/staff-selection`, { staffIds }),
   untickStaff: (projectId, staffId) => request("DELETE", `/projects/${projectId}/staff/${staffId}`),

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import {
   Search, CheckCircle2, Circle, Clock3, AlertTriangle, RefreshCw,
   FileText, X, Landmark, ClipboardList, Users, LogOut, Users2, BarChart3, LayoutGrid, Eye, ShieldCheck,
-  MessageSquare, ListChecks, ArrowLeft,
+  MessageSquare, ListChecks, ArrowLeft, KeyRound,
 } from "lucide-react";
 import { api, setToken } from "../api";
 import { PHASES, STATUS, isOverdue } from "../constants";
@@ -16,6 +16,7 @@ import OverviewPanel from "../components/OverviewPanel";
 import AdminPanel from "../components/AdminPanel";
 import ChatPanel from "../components/ChatPanel";
 import MyTasksPanel from "../components/MyTasksPanel";
+import ChangePasswordModal from "../components/ChangePasswordModal";
 import NextSteps from "../components/NextSteps";
 
 const NO_PERMS = { editTaskFields: false, editProgress: false, addProcess: false, manageStaff: false, manageMembers: false, manageProject: false, manageLock: false };
@@ -40,6 +41,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
   const [adminOpen, setAdminOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [myTasksOpen, setMyTasksOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const [exportingDetail, setExportingDetail] = useState(false);
 
@@ -297,6 +299,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
             <SealBadge percent={stats.percent} />
             <div className="user-chip">
               <span>{user.name}</span>
+              <button onClick={() => setPasswordOpen(true)} title="Đổi mật khẩu" type="button"><KeyRound size={13} /></button>
               <button onClick={onLogout} title="Đăng xuất" type="button"><LogOut size={13} /></button>
             </div>
           </div>
@@ -475,6 +478,10 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
 
       {myTasksOpen && (
         <MyTasksPanel onClose={() => setMyTasksOpen(false)} />
+      )}
+
+      {passwordOpen && (
+        <ChangePasswordModal onClose={() => setPasswordOpen(false)} />
       )}
     </div>
   );

@@ -54,7 +54,11 @@ function TaskRow({
           <span className="task-row-actions">
             <IconBtn icon={ArrowUp} title="Chuyển lên" onClick={() => onMove(task.id, -1)} disabled={!canMoveUp} />
             <IconBtn icon={ArrowDown} title="Chuyển xuống" onClick={() => onMove(task.id, 1)} disabled={!canMoveDown} />
-            <ConfirmButton icon={Trash2} title="Xoá bước này" confirmLabel="Xoá?" danger onConfirm={() => onDelete(task.id)} />
+            <ConfirmButton
+              icon={Trash2} title={overdue && !canLock ? "Việc đã trễ hạn — chỉ Chủ dự án được xoá" : "Xoá bước này"}
+              confirmLabel="Xoá?" danger onConfirm={() => onDelete(task.id)}
+              disabled={overdue && !canLock}
+            />
           </span>
         )}
       </div>

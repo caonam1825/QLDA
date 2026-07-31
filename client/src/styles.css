@@ -572,3 +572,63 @@ body {
   font-size: 10.5px; color: var(--gold); background: var(--gold-soft); border-radius: 999px;
   padding: 2px 8px; align-self: flex-start;
 }
+
+/* --- Trang chủ kiểu sidebar (theo giao diện tham khảo) --- */
+.home-shell { display: flex; align-items: stretch; min-height: 100vh; }
+.home-sidebar {
+  width: 240px; flex-shrink: 0; background: linear-gradient(180deg, var(--side-bg-1), var(--side-bg-2));
+  color: var(--side-text); display: flex; flex-direction: column; padding: 16px 12px;
+}
+.home-sidebar-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; padding: 4px 6px; }
+.home-sidebar-sub { font-size: 11px; color: var(--side-text-dim); padding: 0 6px 14px; border-bottom: 1px solid var(--side-line); margin-bottom: 10px; }
+.home-sidebar-nav { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+.home-sidebar-nav-item {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; border-radius: 8px;
+  background: none; border: none; color: var(--side-text); font-size: 13px; cursor: pointer; text-align: left;
+}
+.home-sidebar-nav-item:hover { background: var(--side-hover); }
+.home-sidebar-nav-item-active { background: var(--side-active); font-weight: 600; }
+.home-sidebar-search {
+  display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.07); border-radius: 8px;
+  padding: 6px 9px; margin-bottom: 10px; color: var(--side-text-dim);
+}
+.home-sidebar-search input { background: none; border: none; outline: none; color: var(--side-text); font-size: 12.5px; flex: 1; }
+.home-sidebar-search input::placeholder { color: var(--side-text-dim); }
+.home-sidebar-section-label { font-size: 10.5px; letter-spacing: 0.06em; color: var(--side-text-dim); padding: 4px 8px; }
+.home-sidebar-projects { display: flex; flex-direction: column; gap: 1px; overflow-y: auto; flex: 1; margin-bottom: 8px; }
+.home-sidebar-project-item {
+  display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 7px;
+  background: none; border: none; color: var(--side-text); font-size: 12.5px; cursor: pointer; text-align: left;
+}
+.home-sidebar-project-item:hover { background: var(--side-hover); }
+.home-sidebar-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.home-sidebar-project-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-sidebar-add-project {
+  display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px; border-radius: 8px;
+  border: 1px dashed var(--side-line); background: none; color: var(--side-text-dim); font-size: 12.5px; cursor: pointer;
+}
+.home-sidebar-add-project:hover { background: var(--side-hover); color: var(--side-text); }
+
+.home-main-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* --- Biểu đồ cột chồng (StackedBarChart) --- */
+.home-chart-section {
+  background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 16px 18px; margin-bottom: 20px; box-shadow: var(--shadow-sm);
+}
+.home-chart-title { font-size: 14px; margin: 0 0 14px; color: var(--ink); }
+.stacked-chart { display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap; }
+.stacked-chart-bars { display: flex; gap: 20px; align-items: flex-end; flex: 1; min-width: 0; overflow-x: auto; padding-bottom: 4px; }
+.stacked-chart-col { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 46px; }
+.stacked-chart-bar-wrap { position: relative; width: 30px; background: #F1F5F9; border-radius: 4px; overflow: hidden; }
+.stacked-chart-seg { position: absolute; left: 0; width: 100%; }
+.stacked-chart-label { font-size: 10.5px; color: var(--slate); max-width: 60px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stacked-chart-legend { display: flex; flex-direction: column; gap: 6px; font-size: 11.5px; color: var(--slate); min-width: 150px; }
+.stacked-chart-legend-item { display: flex; align-items: center; gap: 6px; }
+.stacked-chart-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+@media (max-width: 900px) {
+  .home-shell { flex-direction: column; }
+  .home-sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }
+  .home-sidebar-projects { max-height: 160px; }
+}

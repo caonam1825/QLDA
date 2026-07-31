@@ -185,6 +185,22 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   động có quyền cao nhất — toàn quyền trên MỌI dự án (kể cả khoá/mở khoá hạn),
   không phụ thuộc có phải thành viên hay không. Có thể cấp/thu hồi quyền này
   cho người khác trong mục "Quản trị hệ thống" trên header.
+- **Thêm nhân viên ngay từ Trang chủ**: mục "Nhân viên" trên sidebar Trang chủ
+  giờ cho phép thêm hồ sơ nhân viên mới mà KHÔNG cần mở một dự án cụ thể nào —
+  vào từng dự án chỉ cần tích chọn (mục "Nhân viên" trong dự án), không phải
+  nhập lại thông tin/số điện thoại.
+- **Giao diện Trang chủ dạng sidebar** — sidebar tối bên trái (Tổng quan,
+  Việc của tôi, Nhân viên, Báo cáo & KPI, Quản trị hệ thống, danh sách dự án
+  có chấm màu) cùng biểu đồ cột chia màu theo trạng thái cho từng dự án, theo
+  đúng phong cách giao diện bạn gửi tham khảo.
+- **Tự đổi mật khẩu đăng nhập**: bấm biểu tượng chìa khoá cạnh tên mình trên
+  góc phải màn hình (Trang chủ hoặc trong 1 dự án) để đổi mật khẩu (cần nhập
+  đúng mật khẩu hiện tại). Nếu quên mật khẩu, nhờ Quản trị hệ thống đặt lại hộ
+  trong mục "Quản trị hệ thống" (không cần biết mật khẩu cũ).
+- **Không ai xoá tuỳ tiện được việc đã trễ hạn**: nút xoá một đầu việc (hoặc
+  xoá cả nhóm có chứa việc trễ hạn) tự động khoá lại nếu việc đó đã trễ hạn —
+  chỉ Chủ dự án (hoặc Quản trị hệ thống) mới xoá được, để giữ đúng dữ liệu
+  làm căn cứ họp/tính KPI, tránh nhân viên xoá đi bằng chứng trễ hạn.
 - **Khoá hạn hoàn thành làm căn cứ KPI**: mỗi đầu việc có thể được chủ dự án
   khoá hạn hoàn thành lại — sau khi khoá, không ai (kể cả chủ dự án qua thao
   tác thường) sửa được hạn nữa cho đến khi mở khoá lại, đảm bảo dữ liệu KPI
