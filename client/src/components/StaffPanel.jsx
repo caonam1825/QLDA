@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from "react";
-import { Users2, X, Plus, Trash2, MessageCircle, Link2Off, KeyRound, Search, Check } from "lucide-react";
+import { Users2, X, Plus, Trash2, MessageCircle, Link2Off, KeyRound, Search, Check, Building2 } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 import { ROLE_OPTIONS } from "../constants";
 import PersonTasksModal from "./PersonTasksModal";
+import CompanyStaffPanel from "./CompanyStaffPanel";
 
 const emptyForm = { name: "", position: "", department: "", email: "", phone: "" };
 const emptyLogin = { mode: "none", loginPhone: "", loginPassword: "", role: "viewer" }; // mode: 'none' | 'grant' | 'link'
@@ -19,6 +20,7 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const [zaloCodeFor, setZaloCodeFor] = useState(null); // { staffId, code }
   const [tasksFor, setTasksFor] = useState(null); // staff object, để xem việc đang phụ trách
+  const [companyPanelOpen, setCompanyPanelOpen] = useState(false);
 
   const currentIds = useMemo(() => new Set(project.staff.map(s => s.id)), [project.staff]);
 
@@ -130,6 +132,9 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
         <p className="invite-hint">
           Danh bạ nhân viên dùng CHUNG cho toàn công ty — chỉ cần tạo hồ sơ 1 lần, sau đó <b>tích chọn</b> ai
           thuộc dự án nào ngay dưới đây, không cần nhập lại số điện thoại mỗi lần.
+          {" "}<button type="button" className="staff-view-all-link" onClick={() => setCompanyPanelOpen(true)}>
+            <Building2 size={12} style={{ verticalAlign: -1 }} /> Xem tất cả nhân viên công ty
+          </button>
         </p>
 
         {error && <div className="auth-error">{error}</div>}
@@ -286,6 +291,10 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
           personKey={tasksFor.phone ? `phone:${tasksFor.phone}` : `name:${tasksFor.name}|${tasksFor.department}`}
           onClose={() => setTasksFor(null)}
         />
+      )}
+
+      {companyPanelOpen && (
+        <CompanyStaffPanel canManage={canManage} onClose={() => { setCompanyPanelOpen(false); loadDirectory(); onChanged(); }} />
       )}
     </div>
   );

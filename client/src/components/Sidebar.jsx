@@ -33,7 +33,7 @@ export default function Sidebar({
           className={`home-sidebar-nav-item ${!currentProjectId ? "home-sidebar-nav-item-active" : ""}`}
           onClick={onGoHome} type="button"
         >
-          <HomeIcon size={15} /> Tổng quan
+          <HomeIcon size={15} /> Trang chủ
         </button>
         <button className="home-sidebar-nav-item" onClick={onOpenMyTasks} type="button">
           <ListChecks size={15} /> Việc của tôi

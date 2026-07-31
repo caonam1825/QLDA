@@ -659,3 +659,10 @@ body {
   color: var(--slate); cursor: pointer; width: 100%; justify-content: center;
 }
 .profile-change-password-btn:hover { background: var(--paper); color: var(--ink); }
+
+/* --- Liên kết "Xem tất cả nhân viên công ty" trong StaffPanel --- */
+.staff-view-all-link {
+  display: inline-flex; align-items: center; gap: 3px; background: none; border: none;
+  color: var(--navy); text-decoration: underline; font-size: 12px; cursor: pointer; padding: 0;
+}
+.staff-view-all-link:hover { color: var(--gold); }

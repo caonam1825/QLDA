@@ -110,7 +110,7 @@ export default function Home({ user, onLogout, onOpenProject, onUserUpdated }) {
           <div className="home-header-inner">
             <div>
               <span className="app-eyebrow">BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC</span>
-              <h1>Tổng quan</h1>
+              <h1>Trang chủ</h1>
               <p>Toàn bộ dự án, nhân viên và tiến độ công ty — chọn 1 dự án bên dưới để xem chi tiết &amp; giao việc.</p>
             </div>
             <div className="app-header-right">

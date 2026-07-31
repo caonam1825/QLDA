@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   phone TEXT UNIQUE NOT NULL,
   email TEXT,
+  position TEXT NOT NULL DEFAULT '',
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
   is_super_admin INTEGER NOT NULL DEFAULT 0,
@@ -220,6 +221,13 @@ if (!userColsNow.includes("is_super_admin")) {
   // thống luôn có ít nhất 1 người có quyền cao nhất sau khi nâng cấp.
   const first = db.prepare("SELECT id FROM users ORDER BY created_at ASC LIMIT 1").get();
   if (first) db.prepare("UPDATE users SET is_super_admin = 1 WHERE id = ?").run(first.id);
+}
+
+// Safe migration for databases created before self-service "chức vụ"
+// (position) trong hồ sơ cá nhân existed.
+const userColsForPosition = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (!userColsForPosition.includes("position")) {
+  db.exec("ALTER TABLE users ADD COLUMN position TEXT NOT NULL DEFAULT ''");
 }
 
 // Migration: databases created before "Ban quản lý dự án dùng chung" existed

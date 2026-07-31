@@ -39,7 +39,7 @@ export default function ProjectSwitcher({ projects, currentId, onSelect, onCreat
                 onClick={() => { onShowAll(); setOpen(false); }}
                 type="button"
               >
-                <LayoutGrid size={13} /> Tất cả dự án (Tổng hợp)
+                <LayoutGrid size={13} /> Trang chủ (tất cả dự án)
               </button>
               <div className="switcher-divider" />
             </>

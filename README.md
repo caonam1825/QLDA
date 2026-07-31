@@ -232,7 +232,10 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   nhập để tích chọn nhanh (kèm chọn quyền), thay vì phải gõ lại số điện thoại
   — vẫn giữ ô nhập SĐT thủ công cho trường hợp cần thêm người ngoài danh bạ.
 - **Cập nhật thông tin cá nhân**: bấm vào avatar (chữ cái đầu tên) ở góc màn
-  hình để sửa họ tên/email, hoặc đổi mật khẩu ngay từ đó.
+  hình để sửa họ tên/chức vụ/email, đổi mật khẩu, hoặc **tự kết nối Zalo
+  ngay** (lấy mã liên kết cho chính mình, không cần nhờ quản trị dự án) —
+  cần công ty đã có Zalo Official Account, có link hướng dẫn tạo miễn phí
+  ngay trong màn hình đó nếu chưa có.
 - **Giao diện đồng nhất Trang chủ ↔ từng dự án**: sidebar tối màu tím-navy
   (Tổng quan, Việc của tôi, Nhân viên, Báo cáo & KPI, Quản trị hệ thống, danh
   sách dự án có chấm màu) hiển thị giống hệt nhau dù đang ở Trang chủ hay bên

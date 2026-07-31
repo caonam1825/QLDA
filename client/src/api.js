@@ -37,6 +37,8 @@ export const api = {
   me: () => request("GET", "/auth/me"),
   updateMe: (patch) => request("PATCH", "/auth/me", patch),
   changePassword: (currentPassword, newPassword) => request("POST", "/auth/change-password", { currentPassword, newPassword }),
+  getMyZaloCode: () => request("POST", "/auth/zalo-code"),
+  unlinkMyZalo: () => request("DELETE", "/auth/zalo-link"),
 
   adminResetPassword: (userId, newPassword) => request("POST", `/admin/users/${userId}/reset-password`, { newPassword }),
 
