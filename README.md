@@ -98,6 +98,20 @@ bền vững (persistent volume) như Render, Railway, Fly.io cũng chạy đư�
 này gần như không cần sửa gì — chỉ cần cấu hình biến môi trường `JWT_SECRET`
 và mount volume cho đường dẫn `DB_PATH`.
 
+> ⚠️ **QUAN TRỌNG — chống mất dữ liệu khi deploy trên Render (miễn phí):**
+> Ổ đĩa mặc định của Render là **tạm thời** — mỗi lần bạn cập nhật code (deploy
+> lại), toàn bộ dữ liệu (dự án, công việc, tài khoản…) trong `server/data/app.db`
+> sẽ **bị xoá sạch** nếu không làm bước này:
+> 1. Vào trang service trên Render → tab **Disks** → **Add Disk**.
+> 2. Đặt tên bất kỳ (VD `data`), **Mount Path** điền `/data`, dung lượng 1 GB
+>    là quá đủ cho hầu hết trường hợp dùng.
+> 3. Vào tab **Environment** → thêm biến `DB_PATH` = `/data/app.db`.
+> 4. Bấm **Save, rebuild, and deploy** để áp dụng.
+>
+> Làm đúng bước này 1 LẦN DUY NHẤT — từ đó về sau, mỗi lần bạn nhờ cập nhật
+> thêm tính năng và deploy lại, dữ liệu vẫn giữ nguyên, người dùng không cần
+> cài lại gì cả, chỉ cần mở lại app là thấy bản mới (xem thêm mục 12).
+
 ---
 
 ## 5. Cấu trúc dự án
@@ -353,3 +367,29 @@ Nếu chưa `npm install` lại sau khi cập nhật, khi bấm "Xuất PDF"/"Xu
 server sẽ báo lỗi rõ ràng "Kiểm tra server đã cài đặt thư viện 'pdfkit' và
 'docx' chưa" thay vì crash — cứ chạy `npm install` rồi khởi động lại server
 là dùng được ngay, không cần thao tác gì thêm với dữ liệu.
+
+## 12. Cập nhật lên bản mới không cần cài lại, không mất dữ liệu
+
+Đây là quy trình mỗi khi bạn nhờ cập nhật thêm tính năng và nhận được bộ mã
+nguồn mới:
+
+1. **Đã làm bước "Disk" ở mục 4 chưa?** Nếu chưa, làm ngay trước khi deploy
+   lần tới — nếu không, dữ liệu sẽ mất mỗi lần cập nhật (xem cảnh báo ở mục 4).
+2. Ghi đè các file thay đổi lên repo GitHub của bạn (kéo-thả lại toàn bộ thư
+   mục `app` như lần đầu, hoặc `git push` nếu dùng dòng lệnh) — **không cần
+   xoá repo cũ**, GitHub tự nhận diện file nào thay đổi.
+3. Nếu dùng Render: repo cập nhật sẽ **tự động kích hoạt deploy mới** (hoặc
+   vào Render Dashboard → service → **Manual Deploy** → **Deploy latest
+   commit** nếu muốn deploy ngay không chờ).
+4. Đợi Render build xong (vài phút) — dữ liệu trong Disk vẫn nguyên vẹn vì
+   nó tách biệt hoàn toàn với code.
+5. Người dùng **không cần làm gì cả** — lần sau họ mở lại app (icon đã cài
+   trên điện thoại/máy tính), ứng dụng tự nhận ra có bản mới và hiện dòng
+   chữ nhỏ ở cuối màn hình: **"Đã có bản cập nhật mới — Tải lại để dùng
+   ngay"**. Họ chỉ cần bấm nút đó — không gỡ, không cài lại, không mất dữ
+   liệu đang có trên hệ thống (vì dữ liệu luôn nằm trên server, không nằm
+   trên máy/điện thoại của họ).
+
+Nếu ai đó chưa thấy bản mới ngay cả sau khi bấm "Tải lại", bảo họ đóng hẳn
+app rồi mở lại 1 lần (một số trình duyệt cần 1 lượt mở lại để service worker
+mới chính thức tiếp quản).
