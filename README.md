@@ -223,10 +223,15 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   động có quyền cao nhất — toàn quyền trên MỌI dự án (kể cả khoá/mở khoá hạn),
   không phụ thuộc có phải thành viên hay không. Có thể cấp/thu hồi quyền này
   cho người khác trong mục "Quản trị hệ thống" trên header.
-- **Giao tiến độ hàng loạt cho cả nhóm bước**: mỗi nhóm bước lớn (I, II, III…)
-  có nút "Giao tiến độ cho cả nhóm" — chọn trạng thái/người phụ trách/hạn
-  chung rồi áp dụng cho TOÀN BỘ công việc trong nhóm cùng lúc, không cần tích
-  chỉnh từng dòng bên trong.
+- **Giao tiến độ hàng loạt cho cả nhóm bước lẫn cả giai đoạn lớn**: mỗi nhóm
+  bước (I, II, III…) VÀ mỗi giai đoạn lớn (Chủ trương đầu tư, Quy hoạch & Đất
+  đai…) đều có nút "Giao tiến độ" riêng — chọn trạng thái/người phụ
+  trách/hạn chung rồi áp dụng cho TOÀN BỘ công việc bên trong cùng lúc.
+- **Quản trị hệ thống phê duyệt tài khoản đăng ký mới**: từ người đăng ký thứ
+  2 trở đi, tài khoản tự đăng ký cần Quản trị hệ thống phê duyệt (mục "Quản
+  trị hệ thống" → "Đang chờ phê duyệt") mới đăng nhập được — chặn người lạ tự
+  tạo tài khoản truy cập hệ thống. Tài khoản do admin cấp trực tiếp (qua mục
+  Nhân viên) được duyệt tự động, không cần thao tác thêm.
 - **Thành viên dự án — tích chọn từ nhân viên đã có tài khoản**: mục "Thành
   viên" trong dự án giờ hiển thị sẵn danh sách nhân viên đã có tài khoản đăng
   nhập để tích chọn nhanh (kèm chọn quyền), thay vì phải gõ lại số điện thoại

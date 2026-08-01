@@ -146,6 +146,8 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
     withSave(async () => (await api.addGroup(currentId, phaseKey, "Nhóm bước mới")).project);
   const handleBulkAssign = (groupId, patch) =>
     withSave(async () => (await api.bulkUpdateGroupProgress(groupId, patch)).project);
+  const handleBulkAssignPhase = (phaseKey, patch) =>
+    withSave(async () => (await api.bulkUpdatePhaseProgress(currentId, phaseKey, patch)).project);
   const handleRenameGroup = (groupId, name) =>
     withSave(async () => (await api.renameGroup(groupId, name)).project);
   const handleDeleteGroup = (groupId) =>
@@ -452,6 +454,7 @@ export default function Dashboard({ user, onLogout, initialProjectId, onBackHome
               onAddTask={handleAddTask}
               onAddGroup={handleAddGroup}
               onBulkAssign={handleBulkAssign}
+              onBulkAssignPhase={handleBulkAssignPhase}
               firstPhase={i === 0}
             />
           ))

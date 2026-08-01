@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { Users, X, Plus, Trash2, Check } from "lucide-react";
+import { Users, X, Plus, Trash2, Check, Search } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 import { ROLE_OPTIONS, roleLabel } from "../constants";
@@ -12,6 +12,7 @@ export default function MembersPanel({ project, canManage, onClose, onChanged })
   const [directory, setDirectory] = useState([]);
   const [loadingDirectory, setLoadingDirectory] = useState(true);
   const [rowRole, setRowRole] = useState({}); // staffId -> vai trò chọn trước khi tích
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     api.getStaffDirectory()
@@ -22,6 +23,11 @@ export default function MembersPanel({ project, canManage, onClose, onChanged })
 
   const memberUserIds = useMemo(() => new Set(project.members.map(m => m.id)), [project.members]);
   const staffWithAccounts = useMemo(() => directory.filter(s => s.hasLogin && s.linkedUserId), [directory]);
+  const filteredStaffWithAccounts = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return staffWithAccounts;
+    return staffWithAccounts.filter(s => `${s.name} ${s.position} ${s.department} ${s.phone}`.toLowerCase().includes(q));
+  }, [staffWithAccounts, query]);
 
   async function handleInvite(e) {
     e.preventDefault();
@@ -115,8 +121,14 @@ export default function MembersPanel({ project, canManage, onClose, onChanged })
                 tài khoản trước, sau đó quay lại đây tích chọn.
               </p>
             ) : (
-              <div className="staff-directory-list">
-                {staffWithAccounts.map(s => {
+              <>
+                <div className="staff-search-row">
+                  <Search size={14} />
+                  <input type="text" placeholder="Tìm theo tên, chức vụ, phòng ban, SĐT…" value={query} onChange={e => setQuery(e.target.value)} />
+                </div>
+                <div className="staff-directory-list">
+                  {filteredStaffWithAccounts.length === 0 && <p className="invite-hint">Không tìm thấy ai phù hợp.</p>}
+                  {filteredStaffWithAccounts.map(s => {
                   const checked = memberUserIds.has(s.linkedUserId);
                   return (
                     <div key={s.id} className={`staff-directory-row ${checked ? "staff-directory-row-checked" : ""}`}>
@@ -143,7 +155,8 @@ export default function MembersPanel({ project, canManage, onClose, onChanged })
                     </div>
                   );
                 })}
-              </div>
+                </div>
+              </>
             )}
 
             <form className="invite-form" onSubmit={handleInvite}>

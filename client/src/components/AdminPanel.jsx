@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
-import { ShieldCheck, X, KeyRound } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import { ShieldCheck, X, KeyRound, Check, Ban, Clock3 } from "lucide-react";
+import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 
 export default function AdminPanel({ currentUserId, onClose }) {
@@ -21,12 +22,33 @@ export default function AdminPanel({ currentUserId, onClose }) {
 
   useEffect(load, []);
 
+  const pendingUsers = useMemo(() => users.filter(u => !u.isApproved), [users]);
+  const approvedUsers = useMemo(() => users.filter(u => u.isApproved), [users]);
+
   async function toggle(u) {
     try {
       await api.adminSetSuperAdmin(u.id, !u.isSuperAdmin);
       load();
     } catch (e) {
       setError(e.message || "Không đổi được quyền");
+    }
+  }
+
+  async function handleApprove(u) {
+    try {
+      await api.adminApproveUser(u.id);
+      load();
+    } catch (e) {
+      setError(e.message || "Không duyệt được");
+    }
+  }
+
+  async function handleReject(u) {
+    try {
+      await api.adminRejectUser(u.id);
+      load();
+    } catch (e) {
+      setError(e.message || "Không từ chối được");
     }
   }
 
@@ -53,7 +75,7 @@ export default function AdminPanel({ currentUserId, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={e => e.stopPropagation()}>
+      <div className="modal-card staff-modal-card" onClick={e => e.stopPropagation()}>
         <div className="modal-head">
           <h3><ShieldCheck size={16} /> Quản trị hệ thống</h3>
           <button className="modal-close" onClick={onClose} type="button"><X size={16} /></button>
@@ -68,33 +90,59 @@ export default function AdminPanel({ currentUserId, onClose }) {
         {error && !resetFor && <div className="auth-error">{error}</div>}
 
         {!loading && !resetFor && (
-          <div className="members-list">
-            {users.map(u => (
-              <div key={u.id} className="member-row">
-                <div className="member-info">
-                  <span className="member-name">{u.name}</span>
-                  <span className="member-email">{u.phone}{u.email ? ` · ${u.email}` : ""}</span>
+          <>
+            {pendingUsers.length > 0 && (
+              <>
+                <p className="report-section-title report-title-warn">
+                  <Clock3 size={13} style={{ verticalAlign: -2, marginRight: 4 }} />
+                  Đang chờ phê duyệt ({pendingUsers.length})
+                </p>
+                <div className="members-list" style={{ marginBottom: 14 }}>
+                  {pendingUsers.map(u => (
+                    <div key={u.id} className="member-row">
+                      <div className="member-info">
+                        <span className="member-name">{u.name}</span>
+                        <span className="member-email">{u.phone}{u.email ? ` · ${u.email}` : ""}</span>
+                      </div>
+                      <button className="icon-btn" title="Phê duyệt" onClick={() => handleApprove(u)} type="button">
+                        <Check size={13} />
+                      </button>
+                      <ConfirmButton icon={Ban} title="Từ chối (xoá tài khoản này)" confirmLabel="Từ chối?" danger onConfirm={() => handleReject(u)} />
+                    </div>
+                  ))}
                 </div>
-                {u.isSuperAdmin ? (
-                  <span className="zalo-status zalo-status-on"><ShieldCheck size={12} /> Quản trị hệ thống</span>
-                ) : (
-                  <span className="zalo-status zalo-status-off">Người dùng thường</span>
-                )}
-                <button className="icon-btn" title="Đặt lại mật khẩu (khi họ quên)" onClick={() => openReset(u)} type="button">
-                  <KeyRound size={13} />
-                </button>
-                <button
-                  className="icon-btn"
-                  onClick={() => toggle(u)}
-                  disabled={u.id === currentUserId && u.isSuperAdmin}
-                  title={u.id === currentUserId && u.isSuperAdmin ? "Không thể tự thu hồi quyền của chính mình" : (u.isSuperAdmin ? "Thu hồi quyền" : "Cấp quyền Quản trị hệ thống")}
-                  type="button"
-                >
-                  {u.isSuperAdmin ? "Thu hồi" : "Cấp quyền"}
-                </button>
-              </div>
-            ))}
-          </div>
+              </>
+            )}
+
+            <p className="report-section-title">Tất cả người dùng ({approvedUsers.length})</p>
+            <div className="members-list">
+              {approvedUsers.map(u => (
+                <div key={u.id} className="member-row">
+                  <div className="member-info">
+                    <span className="member-name">{u.name}</span>
+                    <span className="member-email">{u.phone}{u.email ? ` · ${u.email}` : ""}</span>
+                  </div>
+                  {u.isSuperAdmin ? (
+                    <span className="zalo-status zalo-status-on"><ShieldCheck size={12} /> Quản trị hệ thống</span>
+                  ) : (
+                    <span className="zalo-status zalo-status-off">Người dùng thường</span>
+                  )}
+                  <button className="icon-btn" title="Đặt lại mật khẩu (khi họ quên)" onClick={() => openReset(u)} type="button">
+                    <KeyRound size={13} />
+                  </button>
+                  <button
+                    className="icon-btn"
+                    onClick={() => toggle(u)}
+                    disabled={u.id === currentUserId && u.isSuperAdmin}
+                    title={u.id === currentUserId && u.isSuperAdmin ? "Không thể tự thu hồi quyền của chính mình" : (u.isSuperAdmin ? "Thu hồi quyền" : "Cấp quyền Quản trị hệ thống")}
+                    type="button"
+                  >
+                    {u.isSuperAdmin ? "Thu hồi" : "Cấp quyền"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </>
         )}
 
         {resetFor && (

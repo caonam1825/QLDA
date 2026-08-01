@@ -9,14 +9,34 @@ router.use(requireSuperAdmin);
 // Danh sách toàn bộ người dùng trong hệ thống — chỉ Quản trị hệ thống xem được.
 router.get("/users", (req, res) => {
   const rows = db
-    .prepare("SELECT id, phone, email, name, is_super_admin, created_at FROM users ORDER BY created_at ASC")
+    .prepare("SELECT id, phone, email, name, position, is_super_admin, is_approved, created_at FROM users ORDER BY created_at ASC")
     .all();
   res.json({
     users: rows.map(r => ({
-      id: r.id, phone: r.phone, email: r.email || "", name: r.name,
-      isSuperAdmin: !!r.is_super_admin, createdAt: r.created_at,
+      id: r.id, phone: r.phone, email: r.email || "", name: r.name, position: r.position || "",
+      isSuperAdmin: !!r.is_super_admin, isApproved: !!r.is_approved, createdAt: r.created_at,
     })),
   });
+});
+
+// Phê duyệt 1 tài khoản tự đăng ký — từ đó họ mới đăng nhập được.
+router.post("/users/:id/approve", (req, res) => {
+  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(req.params.id);
+  if (!user) return res.status(404).json({ error: "Không tìm thấy người dùng" });
+  db.prepare("UPDATE users SET is_approved = 1 WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
+});
+
+// Từ chối (xoá hẳn) 1 tài khoản đang chờ duyệt — dùng khi đây là người lạ /
+// đăng ký nhầm, không nên để tồn tại trong hệ thống.
+router.delete("/users/:id/reject", (req, res) => {
+  const user = db.prepare("SELECT id, is_approved FROM users WHERE id = ?").get(req.params.id);
+  if (!user) return res.status(404).json({ error: "Không tìm thấy người dùng" });
+  if (user.is_approved) {
+    return res.status(400).json({ error: "Tài khoản này đã được duyệt — dùng nút thu hồi quyền thay vì từ chối." });
+  }
+  db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+  res.json({ ok: true });
 });
 
 // Cấp / thu hồi quyền Quản trị hệ thống cho một người dùng khác.

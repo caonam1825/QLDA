@@ -270,8 +270,8 @@ router.post("/staff-directory", (req, res) => {
     if (!user) {
       const uid = nanoid();
       db.prepare(
-        "INSERT INTO users (id, phone, email, password_hash, name, created_at) VALUES (?,?,?,?,?,?)"
-      ).run(uid, normalizedPhone, (email && email.trim()) || null, hashPassword(loginPassword), name.trim(), Date.now());
+        "INSERT INTO users (id, phone, email, password_hash, name, is_approved, created_at) VALUES (?,?,?,?,?,?,?)"
+      ).run(uid, normalizedPhone, (email && email.trim()) || null, hashPassword(loginPassword), name.trim(), 1, Date.now());
       user = { id: uid };
     }
     linkedUserId = user.id;
@@ -520,7 +520,34 @@ router.patch("/groups/:groupId/bulk-progress", (req, res) => {
   tx();
   res.json({ project: fullProject(projectId, access.role) });
 });
-// Khoá / mở khoá hạn hoàn thành — chỉ chủ dự án, để hạn đã khoá trở thành
+
+// Giao tiến độ HÀNG LOẠT cho cả 1 GIAI ĐOẠN LỚN (VD toàn bộ "Chủ trương đầu
+// tư & Lựa chọn nhà đầu tư") — áp dụng cho MỌI công việc trong TẤT CẢ các
+// nhóm bước thuộc giai đoạn đó, không cần vào từng nhóm bên trong.
+router.patch("/:id/phases/:phaseKey/bulk-progress", (req, res) => {
+  const access = requireProjectAccess(req, res, req.params.id, "editProgress");
+  if (!access) return;
+  const { status, assigneeStaffId, assignee, due } = req.body || {};
+  const tasks = db.prepare("SELECT * FROM tasks WHERE project_id = ? AND phase = ?").all(req.params.id, req.params.phaseKey);
+  const now = Date.now();
+  const tx = db.transaction(() => {
+    for (const t of tasks) {
+      const sets = [];
+      const vals = [];
+      if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
+      if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
+      if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
+      if (due !== undefined && !t.due_locked) { sets.push("due_date = ?"); vals.push(due); }
+      if (!sets.length) continue;
+      sets.push("updated_by = ?"); vals.push(req.user.id);
+      sets.push("updated_at = ?"); vals.push(now);
+      vals.push(t.id);
+      db.prepare(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+    }
+  });
+  tx();
+  res.json({ project: fullProject(req.params.id, access.role) });
+});
 // căn cứ cố định khi tính KPI (không ai — kể cả chủ dự án qua API thường —
 // sửa được due_date nữa cho đến khi mở khoá lại ở đây).
 router.post("/tasks/:taskId/lock-due", (req, res) => {
@@ -636,8 +663,8 @@ router.post("/:id/staff", (req, res) => {
     if (!user) {
       const uid = nanoid();
       db.prepare(
-        "INSERT INTO users (id, phone, email, password_hash, name, created_at) VALUES (?,?,?,?,?,?)"
-      ).run(uid, normalizedPhone, (email && email.trim()) || null, hashPassword(loginPassword), name.trim(), Date.now());
+        "INSERT INTO users (id, phone, email, password_hash, name, is_approved, created_at) VALUES (?,?,?,?,?,?,?)"
+      ).run(uid, normalizedPhone, (email && email.trim()) || null, hashPassword(loginPassword), name.trim(), 1, Date.now());
       user = { id: uid };
     }
     linkedUserId = user.id;

@@ -73,6 +73,8 @@ export const api = {
 
   adminListUsers: () => request("GET", "/admin/users"),
   adminSetSuperAdmin: (userId, value) => request("PATCH", `/admin/users/${userId}/super-admin`, { value }),
+  adminApproveUser: (userId) => request("POST", `/admin/users/${userId}/approve`),
+  adminRejectUser: (userId) => request("DELETE", `/admin/users/${userId}/reject`),
 
   getChatMessages: (room) => request("GET", `/chat/${room}/messages`),
   sendChatMessage: (room, body) => request("POST", `/chat/${room}/messages`, { body }),
@@ -112,6 +114,7 @@ export const api = {
   updateTaskField: (taskId, patch) => request("PATCH", `/projects/tasks/${taskId}`, patch),
   updateProgress: (taskId, patch) => request("PATCH", `/projects/tasks/${taskId}/progress`, patch),
   bulkUpdateGroupProgress: (groupId, patch) => request("PATCH", `/projects/groups/${groupId}/bulk-progress`, patch),
+  bulkUpdatePhaseProgress: (projectId, phaseKey, patch) => request("PATCH", `/projects/${projectId}/phases/${phaseKey}/bulk-progress`, patch),
   moveTask: (taskId, direction) => request("POST", `/projects/tasks/${taskId}/move`, { direction }),
   deleteTask: (taskId) => request("DELETE", `/projects/tasks/${taskId}`),
 };

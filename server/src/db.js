@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   name TEXT NOT NULL,
   is_super_admin INTEGER NOT NULL DEFAULT 0,
+  is_approved INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL
 );
 
@@ -228,6 +229,16 @@ if (!userColsNow.includes("is_super_admin")) {
 const userColsForPosition = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
 if (!userColsForPosition.includes("position")) {
   db.exec("ALTER TABLE users ADD COLUMN position TEXT NOT NULL DEFAULT ''");
+}
+
+// Migration: databases created before "Quản trị hệ thống phê duyệt thành
+// viên đăng ký mới" existed. Tài khoản ĐÃ CÓ SẴN trước khi bật tính năng này
+// được tự động coi là đã duyệt (không khoá ngược những người đang dùng bình
+// thường) — chỉ áp dụng phê duyệt cho người đăng ký MỚI từ nay trở đi.
+const userColsForApproval = db.prepare("PRAGMA table_info(users)").all().map((c) => c.name);
+if (!userColsForApproval.includes("is_approved")) {
+  db.exec("ALTER TABLE users ADD COLUMN is_approved INTEGER NOT NULL DEFAULT 0");
+  db.exec("UPDATE users SET is_approved = 1");
 }
 
 // Migration: databases created before "Ban quản lý dự án dùng chung" existed

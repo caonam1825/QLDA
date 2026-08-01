@@ -17,6 +17,7 @@ function serializeUser(row) {
   return {
     id: row.id, phone: row.phone, email: row.email || "", name: row.name,
     position: row.position || "", isSuperAdmin: !!row.is_super_admin,
+    isApproved: !!row.is_approved,
     zaloLinked: !!(staff && staff.zalo_id),
     zaloStaffId: staff ? staff.id : null,
   };
@@ -39,16 +40,25 @@ router.post("/register", (req, res) => {
 
   // Người đăng ký đầu tiên của hệ thống tự động là Quản trị hệ thống (quyền
   // cao nhất, vượt qua mọi phân quyền theo dự án) — để luôn có ít nhất 1
-  // người quản lý được toàn bộ ngay từ đầu.
+  // người quản lý được toàn bộ ngay từ đầu, và cũng tự động được duyệt.
+  // Từ người thứ 2 trở đi, tài khoản TỰ ĐĂNG KÝ cần Quản trị hệ thống phê
+  // duyệt mới đăng nhập được, để tránh người lạ tự tạo tài khoản truy cập.
   const userCount = db.prepare("SELECT COUNT(*) AS c FROM users").get().c;
   const isSuperAdmin = userCount === 0 ? 1 : 0;
+  const isApproved = userCount === 0 ? 1 : 0;
 
   const id = nanoid();
   db.prepare(
-    "INSERT INTO users (id, phone, email, password_hash, name, is_super_admin, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
-  ).run(id, normalizedPhone, (email && email.trim()) || null, hashPassword(password), name.trim(), isSuperAdmin, Date.now());
+    "INSERT INTO users (id, phone, email, password_hash, name, is_super_admin, is_approved, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(id, normalizedPhone, (email && email.trim()) || null, hashPassword(password), name.trim(), isSuperAdmin, isApproved, Date.now());
 
   const row = db.prepare("SELECT * FROM users WHERE id = ?").get(id);
+  if (!isApproved) {
+    return res.json({
+      pending: true,
+      message: "Đăng ký thành công — tài khoản của bạn đang chờ Quản trị hệ thống phê duyệt trước khi đăng nhập được.",
+    });
+  }
   res.json({ token: signToken(row), user: serializeUser(row) });
 });
 
@@ -59,6 +69,9 @@ router.post("/login", (req, res) => {
   const row = db.prepare("SELECT * FROM users WHERE phone = ?").get(normalizedPhone);
   if (!row || !checkPassword(password, row.password_hash)) {
     return res.status(401).json({ error: "Số điện thoại hoặc mật khẩu không đúng" });
+  }
+  if (!row.is_approved) {
+    return res.status(403).json({ error: "Tài khoản của bạn đang chờ Quản trị hệ thống phê duyệt trước khi đăng nhập được." });
   }
   res.json({ token: signToken(row), user: serializeUser(row) });
 });

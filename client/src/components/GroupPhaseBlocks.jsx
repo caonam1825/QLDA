@@ -4,7 +4,7 @@ import { toRoman, STATUS } from "../constants";
 import { MiniBar, IconBtn, ConfirmButton } from "./Basics";
 import TaskRow from "./TaskRow";
 
-function BulkAssignForm({ group, tasks, staffList, onBulkAssign, onCancel }) {
+function BulkAssignForm({ title, count, staffList, onApply, onCancel }) {
   const [status, setStatus] = useState("");
   const [assigneeStaffId, setAssigneeStaffId] = useState("");
   const [due, setDue] = useState("");
@@ -18,7 +18,7 @@ function BulkAssignForm({ group, tasks, staffList, onBulkAssign, onCancel }) {
     if (Object.keys(patch).length === 0) { onCancel(); return; }
     setBusy(true);
     try {
-      await onBulkAssign(group.id, patch);
+      await onApply(patch);
       onCancel();
     } finally {
       setBusy(false);
@@ -28,7 +28,7 @@ function BulkAssignForm({ group, tasks, staffList, onBulkAssign, onCancel }) {
   return (
     <div className="bulk-assign-box" onClick={e => e.stopPropagation()}>
       <div className="bulk-assign-title">
-        Giao tiến độ cho cả nhóm "{group.name}" ({tasks.length} việc) — không cần sửa từng dòng bên trong
+        {title} ({count} việc) — không cần sửa từng dòng bên trong
       </div>
       <div className="bulk-assign-grid">
         <select value={status} onChange={e => setStatus(e.target.value)}>
@@ -42,7 +42,7 @@ function BulkAssignForm({ group, tasks, staffList, onBulkAssign, onCancel }) {
         <input type="date" value={due} onChange={e => setDue(e.target.value)} title="Hạn hoàn thành chung (bỏ trống = giữ nguyên)" />
       </div>
       <div className="bulk-assign-actions">
-        <button type="button" disabled={busy} onClick={apply}>{busy ? "Đang áp dụng…" : "Áp dụng cho cả nhóm"}</button>
+        <button type="button" disabled={busy} onClick={apply}>{busy ? "Đang áp dụng…" : "Áp dụng"}</button>
         <button type="button" className="staff-cancel-edit" onClick={onCancel}>Huỷ</button>
       </div>
     </div>
@@ -106,7 +106,13 @@ export function GroupBlock({
         )}
       </div>
       {open && bulkOpen && (
-        <BulkAssignForm group={group} tasks={tasks} staffList={staffList} onBulkAssign={onBulkAssign} onCancel={() => setBulkOpen(false)} />
+        <BulkAssignForm
+          title={`Giao tiến độ cho cả nhóm "${group.name}"`}
+          count={tasks.length}
+          staffList={staffList}
+          onApply={(patch) => onBulkAssign(group.id, patch)}
+          onCancel={() => setBulkOpen(false)}
+        />
       )}
       {open && (
         <div className="group-body">
@@ -140,11 +146,13 @@ export function GroupBlock({
 
 export function PhaseBlock({
   phase, groups, staffList, perms, onProgressChange, onFieldChange, onDeleteTask,
-  onMoveTask, onLockDue, onUnlockDue, onBulkAssign, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase,
+  onMoveTask, onLockDue, onUnlockDue, onBulkAssign, onBulkAssignPhase, onRenameGroup, onDeleteGroup, onAddTask, onAddGroup, firstPhase,
 }) {
   const allTasks = groups.flatMap(g => g.tasks);
   const done = allTasks.filter(t => t.progress.status === "done").length;
   const canManage = !!perms?.addProcess;
+  const canEditProgress = !!perms?.editProgress;
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   return (
     <section className="phase-block">
@@ -157,7 +165,19 @@ export function PhaseBlock({
           </div>
         </div>
         <MiniBar done={done} total={allTasks.length} />
+        {canEditProgress && allTasks.length > 0 && (
+          <IconBtn icon={Users} title="Giao tiến độ cho cả giai đoạn" onClick={() => setBulkOpen(o => !o)} />
+        )}
       </div>
+      {bulkOpen && (
+        <BulkAssignForm
+          title={`Giao tiến độ cho cả giai đoạn "${phase.label}"`}
+          count={allTasks.length}
+          staffList={staffList}
+          onApply={(patch) => onBulkAssignPhase(phase.key, patch)}
+          onCancel={() => setBulkOpen(false)}
+        />
+      )}
       <div className="phase-body">
         {groups.length === 0 && <div className="phase-empty">Chưa có nhóm bước nào trong giai đoạn này.</div>}
         {groups.map((g, i) => (

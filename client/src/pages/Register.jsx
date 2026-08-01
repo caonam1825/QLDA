@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { UserPlus } from "lucide-react";
+import { UserPlus, Clock3 } from "lucide-react";
 import { api, setToken } from "../api";
 
 export default function Register({ onAuthed, goLogin }) {
@@ -9,15 +9,20 @@ export default function Register({ onAuthed, goLogin }) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [pending, setPending] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      const { token, user } = await api.register(phone.trim(), password, name.trim(), email.trim());
-      setToken(token);
-      onAuthed(user);
+      const result = await api.register(phone.trim(), password, name.trim(), email.trim());
+      if (result.pending) {
+        setPending(true);
+      } else {
+        setToken(result.token);
+        onAuthed(result.user);
+      }
     } catch (err) {
       setError(err.message || "Đăng ký thất bại");
     } finally {
@@ -25,12 +30,33 @@ export default function Register({ onAuthed, goLogin }) {
     }
   }
 
+  if (pending) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="auth-eyebrow">BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC</div>
+          <h1><Clock3 size={20} style={{ verticalAlign: -3, marginRight: 6 }} /> Đang chờ phê duyệt</h1>
+          <p className="auth-sub">
+            Đăng ký thành công! Tài khoản của bạn cần Quản trị hệ thống phê duyệt trước khi đăng nhập được.
+            Vui lòng liên hệ quản trị dự án và quay lại đăng nhập sau khi được duyệt.
+          </p>
+          <button type="button" className="auth-switch" onClick={goLogin}>
+            Quay lại đăng nhập
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth-screen">
       <form className="auth-card" onSubmit={handleSubmit}>
         <div className="auth-eyebrow">BAN DỰ ÁN - TCT CỔ PHẦN HỢP LỰC</div>
         <h1>Tạo tài khoản</h1>
-        <p className="auth-sub">Tạo tài khoản để bắt đầu quản lý dự án và mời đồng nghiệp cùng dùng.</p>
+        <p className="auth-sub">
+          Tạo tài khoản để bắt đầu quản lý dự án và mời đồng nghiệp cùng dùng. Tài khoản tự đăng ký cần Quản trị
+          hệ thống phê duyệt trước khi đăng nhập được.
+        </p>
 
         <label className="auth-field">
           <span>Họ và tên</span>
