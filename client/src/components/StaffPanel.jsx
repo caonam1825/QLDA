@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { Users2, X, Plus, Trash2, MessageCircle, Link2Off, KeyRound, Search, Check, Building2 } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
-import { ROLE_OPTIONS } from "../constants";
+import { ROLE_OPTIONS, roleLabel } from "../constants";
 import PersonTasksModal from "./PersonTasksModal";
 import CompanyStaffPanel from "./CompanyStaffPanel";
 
@@ -23,6 +23,30 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
   const [companyPanelOpen, setCompanyPanelOpen] = useState(false);
 
   const currentIds = useMemo(() => new Set(project.staff.map(s => s.id)), [project.staff]);
+  const memberByUserId = useMemo(() => new Map(project.members.map(m => [m.id, m])), [project.members]);
+
+  async function handleGrantRole(staff, role) {
+    try {
+      const existing = memberByUserId.get(staff.linkedUserId);
+      if (existing) {
+        await api.updateMemberRole(project.id, staff.linkedUserId, role);
+      } else {
+        await api.addMember(project.id, staff.phone, role);
+      }
+      onChanged();
+    } catch (err) {
+      setError(err.message || "Không cấp được quyền");
+    }
+  }
+
+  async function handleRevokeRole(staff) {
+    try {
+      await api.removeMember(project.id, staff.linkedUserId);
+      onChanged();
+    } catch (err) {
+      setError(err.message || "Không thu hồi được quyền");
+    }
+  }
 
   function loadDirectory() {
     setLoadingDirectory(true);
@@ -130,8 +154,9 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
         </div>
 
         <p className="invite-hint">
-          Danh bạ nhân viên dùng CHUNG cho toàn công ty — chỉ cần tạo hồ sơ 1 lần, sau đó <b>tích chọn</b> ai
-          thuộc dự án nào ngay dưới đây, không cần nhập lại số điện thoại mỗi lần.
+          Danh bạ nhân viên dùng CHUNG cho toàn công ty. <b>Bước 1:</b> tích ô vuông để thêm người vào dự án này —
+          không cần gõ tên hay số điện thoại. <b>Bước 2 (nếu cần):</b> nếu người đó đã có tài khoản đăng nhập, bấm
+          "+ Cấp quyền chỉnh sửa" ngay trên cùng dòng để họ tự sửa được dữ liệu (không chỉ được gán việc).
           {" "}<button type="button" className="staff-view-all-link" onClick={() => setCompanyPanelOpen(true)}>
             <Building2 size={12} style={{ verticalAlign: -1 }} /> Xem tất cả nhân viên công ty
           </button>
@@ -182,6 +207,35 @@ export default function StaffPanel({ project, canManage, onClose, onChanged }) {
                   <span className={`zalo-status ${s.zaloLinked ? "zalo-status-on" : "zalo-status-off"}`}>
                     <MessageCircle size={12} /> {s.zaloLinked ? "Đã liên kết Zalo" : "Chưa liên kết Zalo"}
                   </span>
+
+                  {checked && s.hasLogin && canManage && (() => {
+                    const member = memberByUserId.get(s.linkedUserId);
+                    return member ? (
+                      <>
+                        <select
+                          className="member-role-select"
+                          value={member.role}
+                          onChange={e => handleGrantRole(s, e.target.value)}
+                          title="Quyền chỉnh sửa của người này trong dự án"
+                        >
+                          {ROLE_OPTIONS.map(r => <option key={r.key} value={r.key}>{r.label}</option>)}
+                        </select>
+                        {member.role !== "owner" && (
+                          <button className="icon-btn" title="Thu hồi quyền chỉnh sửa (vẫn là nhân viên được gán việc)" onClick={() => handleRevokeRole(s)} type="button">
+                            <X size={13} />
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <button
+                        type="button" className="staff-grant-role-btn"
+                        onClick={() => handleGrantRole(s, "editor")}
+                        title="Cấp quyền chỉnh sửa dự án cho người này"
+                      >
+                        + Cấp quyền chỉnh sửa
+                      </button>
+                    );
+                  })()}
 
                   {canManage && (
                     <>

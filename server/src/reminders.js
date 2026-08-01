@@ -1,7 +1,8 @@
 // Định kỳ quét toàn bộ công việc, gửi nhắc việc qua Zalo cho nhân viên đã
 // liên kết Zalo (xem routes/zalo.js) khi công việc trễ hạn hoặc sắp đến hạn
-// trong 1 ngày tới. Mỗi công việc chỉ nhắc tối đa 1 lần/ngày cho mỗi loại
-// (trễ hạn / sắp đến hạn) — theo dõi qua bảng reminder_log.
+// trong 1 ngày tới. Mỗi công việc chỉ nhắc tối đa 1 lần/ngày cho mỗi loại,
+// cho MỖI người phụ trách riêng (1 việc có thể giao nhiều người, mỗi người
+// đều nhận được nhắc riêng) — theo dõi qua bảng reminder_log.
 
 const db = require("./db");
 const { nanoid } = require("nanoid");
@@ -11,10 +12,19 @@ function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
-function alreadySent(taskId, kind, date) {
+function parseAssigneeIds(raw) {
+  try {
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr.filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function alreadySent(taskId, staffId, kind, date) {
   return !!db
-    .prepare("SELECT 1 FROM reminder_log WHERE task_id = ? AND kind = ? AND sent_date = ?")
-    .get(taskId, kind, date);
+    .prepare("SELECT 1 FROM reminder_log WHERE task_id = ? AND staff_id = ? AND kind = ? AND sent_date = ?")
+    .get(taskId, staffId, kind, date);
 }
 
 function markSent(taskId, staffId, kind, date) {
@@ -33,28 +43,30 @@ async function runReminderSweep() {
     .prepare(
       `SELECT t.*, p.name AS project_name FROM tasks t
        JOIN projects p ON p.id = t.project_id
-       WHERE t.status != 'done' AND t.due_date != '' AND t.assignee_staff_id != ''`
+       WHERE t.status != 'done' AND t.due_date != '' AND t.assignee_staff_ids != '[]'`
     )
     .all();
 
   for (const t of tasks) {
-    const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(t.assignee_staff_id);
-    if (!staff || !staff.zalo_id) continue;
-
     let kind = null;
     if (t.due_date < today) kind = "overdue";
     else if (t.due_date === today || t.due_date === tomorrow) kind = "due_soon";
     if (!kind) continue;
 
-    if (alreadySent(t.id, kind, today)) continue;
+    const assigneeIds = parseAssigneeIds(t.assignee_staff_ids);
+    for (const staffId of assigneeIds) {
+      const staff = db.prepare("SELECT * FROM staff WHERE id = ?").get(staffId);
+      if (!staff || !staff.zalo_id) continue;
+      if (alreadySent(t.id, staff.id, kind, today)) continue;
 
-    const text =
-      kind === "overdue"
-        ? `⚠️ Công việc TRỄ HẠN — "${t.title}" (dự án: ${t.project_name}) — hạn hoàn thành: ${t.due_date}. Vui lòng cập nhật tiến độ trên phần mềm.`
-        : `⏰ Công việc SẮP ĐẾN HẠN — "${t.title}" (dự án: ${t.project_name}) — hạn hoàn thành: ${t.due_date}.`;
+      const text =
+        kind === "overdue"
+          ? `⚠️ Công việc TRỄ HẠN — "${t.title}" (dự án: ${t.project_name}) — hạn hoàn thành: ${t.due_date}. Vui lòng cập nhật tiến độ trên phần mềm.`
+          : `⏰ Công việc SẮP ĐẾN HẠN — "${t.title}" (dự án: ${t.project_name}) — hạn hoàn thành: ${t.due_date}.`;
 
-    await sendZaloText(staff.zalo_id, text);
-    markSent(t.id, staff.id, kind, today);
+      await sendZaloText(staff.zalo_id, text);
+      markSent(t.id, staff.id, kind, today);
+    }
   }
 }
 

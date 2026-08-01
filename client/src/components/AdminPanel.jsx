@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
-import { ShieldCheck, X, KeyRound, Check, Ban, Clock3 } from "lucide-react";
+import { ShieldCheck, X, KeyRound, Check, Ban, Clock3, Trash2 } from "lucide-react";
 import { ConfirmButton } from "./Basics";
 import { api } from "../api";
 
@@ -49,6 +49,15 @@ export default function AdminPanel({ currentUserId, onClose }) {
       load();
     } catch (e) {
       setError(e.message || "Không từ chối được");
+    }
+  }
+
+  async function handleDelete(u) {
+    try {
+      await api.adminDeleteUser(u.id);
+      load();
+    } catch (e) {
+      setError(e.message || "Không xoá được tài khoản này");
     }
   }
 
@@ -139,6 +148,12 @@ export default function AdminPanel({ currentUserId, onClose }) {
                   >
                     {u.isSuperAdmin ? "Thu hồi" : "Cấp quyền"}
                   </button>
+                  {u.id !== currentUserId && (
+                    <ConfirmButton
+                      icon={Trash2} title="Xoá vĩnh viễn tài khoản này" confirmLabel="Xoá hẳn?" danger
+                      onConfirm={() => handleDelete(u)}
+                    />
+                  )}
                 </div>
               ))}
             </div>

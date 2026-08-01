@@ -75,6 +75,7 @@ export const api = {
   adminSetSuperAdmin: (userId, value) => request("PATCH", `/admin/users/${userId}/super-admin`, { value }),
   adminApproveUser: (userId) => request("POST", `/admin/users/${userId}/approve`),
   adminRejectUser: (userId) => request("DELETE", `/admin/users/${userId}/reject`),
+  adminDeleteUser: (userId) => request("DELETE", `/admin/users/${userId}`),
 
   getChatMessages: (room) => request("GET", `/chat/${room}/messages`),
   sendChatMessage: (room, body) => request("POST", `/chat/${room}/messages`, { body }),

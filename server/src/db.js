@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS tasks (
 
   status TEXT NOT NULL DEFAULT 'todo',
   assignee TEXT NOT NULL DEFAULT '',
+  assignee_staff_ids TEXT NOT NULL DEFAULT '[]',
   due_date TEXT NOT NULL DEFAULT '',
   progress_note TEXT NOT NULL DEFAULT '',
   updated_by TEXT,
@@ -106,7 +107,7 @@ CREATE TABLE IF NOT EXISTS reminder_log (
   kind TEXT NOT NULL DEFAULT 'due',
   sent_date TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  UNIQUE(task_id, kind, sent_date)
+  UNIQUE(task_id, staff_id, kind, sent_date)
 );
 
 -- Chat giữa các thành viên. room = 'global' (toàn công ty) hoặc project_id
@@ -137,6 +138,19 @@ CREATE INDEX IF NOT EXISTS idx_project_staff_staff ON project_staff(staff_id);
 const taskCols = db.prepare("PRAGMA table_info(tasks)").all().map((c) => c.name);
 if (!taskCols.includes("assignee_staff_id")) {
   db.exec("ALTER TABLE tasks ADD COLUMN assignee_staff_id TEXT NOT NULL DEFAULT ''");
+}
+
+// Migration: databases created before "giao 1 việc cho nhiều người" existed
+// — chuyển dữ liệu người phụ trách DUY NHẤT cũ (assignee_staff_id) sang
+// dạng danh sách nhiều người (assignee_staff_ids, lưu JSON).
+if (!taskCols.includes("assignee_staff_ids")) {
+  db.exec("ALTER TABLE tasks ADD COLUMN assignee_staff_ids TEXT NOT NULL DEFAULT '[]'");
+  const rowsToMigrate = db.prepare("SELECT id, assignee_staff_id FROM tasks WHERE assignee_staff_id != ''").all();
+  const updateIds = db.prepare("UPDATE tasks SET assignee_staff_ids = ? WHERE id = ?");
+  const txIds = db.transaction((rows) => {
+    for (const r of rows) updateIds.run(JSON.stringify([r.assignee_staff_id]), r.id);
+  });
+  txIds(rowsToMigrate);
 }
 
 // Safe migration for staff created before Zalo linking existed.
@@ -261,6 +275,26 @@ if (staffNeedingProjectStaff.length > 0) {
     for (const r of rows) insertPS.run(r.project_id, r.id, Date.now());
   });
   tx(staffNeedingProjectStaff);
+}
+
+// Migration: bảng reminder_log cũ chỉ UNIQUE theo (task_id, kind, sent_date)
+// — không tính riêng từng người, nên việc giao cho NHIỀU người chỉ nhắc
+// được người đầu tiên. Rebuild lại bảng (dữ liệu log cũ chỉ để chống nhắc
+// trùng, không quan trọng phải giữ) nếu ràng buộc UNIQUE chưa đúng.
+const reminderLogSql = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='reminder_log'").get();
+if (reminderLogSql && !reminderLogSql.sql.includes("UNIQUE(task_id, staff_id, kind, sent_date)")) {
+  db.exec(`
+    DROP TABLE reminder_log;
+    CREATE TABLE reminder_log (
+      id TEXT PRIMARY KEY,
+      task_id TEXT NOT NULL,
+      staff_id TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'due',
+      sent_date TEXT NOT NULL,
+      created_at INTEGER NOT NULL,
+      UNIQUE(task_id, staff_id, kind, sent_date)
+    );
+  `);
 }
 
 module.exports = db;

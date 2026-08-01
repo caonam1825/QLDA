@@ -666,3 +666,64 @@ body {
   color: var(--navy); text-decoration: underline; font-size: 12px; cursor: pointer; padding: 0;
 }
 .staff-view-all-link:hover { color: var(--gold); }
+
+/* --- Cấp quyền ngay trong danh sách Nhân viên --- */
+.staff-grant-role-btn {
+  font-size: 11.5px; padding: 4px 10px; border-radius: 999px; border: 1px dashed var(--navy);
+  background: #fff; color: var(--navy); cursor: pointer; white-space: nowrap;
+}
+.staff-grant-role-btn:hover { background: var(--gold-soft); border-color: var(--gold); color: var(--gold); }
+
+/* --- Chọn nhiều người phụ trách (TaskRow) --- */
+.assignee-multiselect { position: relative; }
+.assignee-multiselect-btn {
+  display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+  padding: 7px 9px; border-radius: 6px; border: 1px solid var(--line); background: #fff;
+  font-size: 12.5px; color: var(--ink); cursor: pointer;
+}
+.assignee-multiselect-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.assignee-multiselect-btn:hover:not(:disabled) { border-color: var(--navy); }
+.assignee-multiselect-panel {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 240px; max-width: 320px;
+  max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: var(--shadow-md); padding: 6px;
+}
+.assignee-multiselect-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 6px 8px;
+  border-radius: 6px; border: none; background: none; font-size: 12.5px; color: var(--ink); cursor: pointer;
+}
+.assignee-multiselect-item:hover { background: var(--paper); }
+.assignee-multiselect-item-on { background: var(--teal-soft); }
+.assignee-multiselect-clear {
+  display: flex; align-items: center; gap: 6px; width: 100%; padding: 6px 8px; margin-top: 2px;
+  border: none; border-top: 1px dashed var(--line); background: none; font-size: 11.5px; color: var(--seal); cursor: pointer;
+}
+.assignee-custom-toggle {
+  align-self: flex-start; margin-top: 4px; font-size: 11px; background: none; border: none;
+  color: var(--slate); text-decoration: underline; cursor: pointer; padding: 0;
+}
+
+/* --- Hiệu ứng chuyển động mượt khi mở modal / chuyển màn hình --- */
+.modal-overlay {
+  animation: fadeIn 0.15s ease-out;
+}
+.modal-card, .report-card, .staff-modal-card, .chat-card {
+  animation: scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: translateY(6px) scale(0.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.app-main, .home-main-col { animation: pageFadeIn 0.25s ease-out; }
+@keyframes pageFadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.project-card, .home-sidebar-project-item, .home-sidebar-nav-item, .topbar-btn, .members-btn {
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease, color 0.12s ease;
+}
+
+/* --- Nền kiểu "desktop wallpaper" cho Trang chủ (theo ảnh tham khảo) --- */
+.home-shell {
+  background:
+    radial-gradient(circle at 15% 10%, rgba(202,138,4,0.10), transparent 45%),
+    radial-gradient(circle at 85% 0%, rgba(30,58,95,0.14), transparent 45%),
+    radial-gradient(circle at 50% 100%, rgba(5,150,105,0.08), transparent 50%),
+    linear-gradient(160deg, #EEF2F8 0%, #F7F5EF 55%, #F1F5F9 100%);
+  background-attachment: fixed;
+}

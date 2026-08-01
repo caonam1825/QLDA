@@ -5,6 +5,16 @@ const { requireAuth } = require("../auth");
 const router = express.Router();
 router.use(requireAuth);
 
+// Một công việc có thể giao cho NHIỀU người (assignee_staff_ids lưu JSON).
+function parseAssigneeIds(raw) {
+  try {
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr.filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
 // Từ khi mọi người dùng đã đăng nhập đều xem được mọi dự án trong hệ thống,
 // báo cáo tổng hợp & KPI cũng tính trên TOÀN BỘ dự án (không chỉ dự án mình
 // là thành viên chính thức) để phản ánh đúng bức tranh toàn công ty.
@@ -12,12 +22,21 @@ function allProjectIds() {
   return db.prepare("SELECT id FROM projects").all().map(r => r.id);
 }
 
+function makeLabelFor(staffById) {
+  return function labelFor(t) {
+    const ids = parseAssigneeIds(t.assignee_staff_ids);
+    const names = ids.map(id => staffById.get(id)?.name).filter(Boolean);
+    if (names.length) return names.join(", ");
+    return t.assignee || "Chưa gán";
+  };
+}
+
 /* ---------------- Tổng hợp nhiều dự án ---------------- */
 
 router.get("/overview", (req, res) => {
   const projectIds = allProjectIds();
   if (projectIds.length === 0) {
-    return res.json({ projects: [], overdueList: [], dueSoonList: [], totals: { total: 0, done: 0, overdue: 0 } });
+    return res.json({ projects: [], overdueList: [], dueSoonList: [], inProgressList: [], totals: { total: 0, done: 0, overdue: 0 } });
   }
   const placeholders = projectIds.map(() => "?").join(",");
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds);
@@ -25,14 +44,10 @@ router.get("/overview", (req, res) => {
   const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const staffById = new Map(allStaff.map(s => [s.id, s]));
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));
+  const labelFor = makeLabelFor(staffById);
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-
-  function labelFor(t) {
-    if (t.assignee_staff_id && staffById.has(t.assignee_staff_id)) return staffById.get(t.assignee_staff_id).name;
-    return t.assignee || "Chưa gán";
-  }
 
   const perProject = new Map(projects.map(p => [p.id, { id: p.id, name: p.name, total: 0, done: 0, doing: 0, todo: 0, blocked: 0, overdue: 0 }]));
   const overdueList = [];
@@ -89,14 +104,15 @@ router.get("/overview", (req, res) => {
 //          − (số việc đang trễ hạn chưa xong × 2) − (số việc đang vướng mắc × 1)
 // Nhân viên được gộp theo SỐ ĐIỆN THOẠI (nếu có) để một người tham gia nhiều
 // dự án vẫn được tính KPI gộp chung; nếu không có số điện thoại thì gộp theo
-// tên + đơn vị.
+// tên + đơn vị. Một việc giao cho NHIỀU người thì MỖI người đều được tính
+// (không chia nhỏ điểm) — khuyến khích phối hợp thay vì thiệt cho ai.
 function computeKpiRanking() {
   const projectIds = allProjectIds();
   if (projectIds.length === 0) return { ranking: [] };
   const placeholders = projectIds.map(() => "?").join(",");
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds);
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));
-  const allTasks = db.prepare(`SELECT * FROM tasks WHERE project_id IN (${placeholders}) AND assignee_staff_id != ''`).all(...projectIds);
+  const allTasks = db.prepare(`SELECT * FROM tasks WHERE project_id IN (${placeholders}) AND assignee_staff_ids != '[]'`).all(...projectIds);
   const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const staffById = new Map(allStaff.map(s => [s.id, s]));
 
@@ -108,34 +124,37 @@ function computeKpiRanking() {
   }
 
   for (const t of allTasks) {
-    const staff = staffById.get(t.assignee_staff_id);
-    if (!staff) continue;
-    const key = keyFor(staff);
-    if (!byPerson.has(key)) {
-      byPerson.set(key, {
-        key, name: staff.name, position: staff.position, department: staff.department,
-        projects: new Set(), assigned: 0, completed: 0, completedOnTime: 0, completedLate: 0,
-        overdueOpen: 0, blocked: 0, doing: 0, todo: 0,
-      });
+    const assigneeIds = parseAssigneeIds(t.assignee_staff_ids);
+    for (const staffId of assigneeIds) {
+      const staff = staffById.get(staffId);
+      if (!staff) continue;
+      const key = keyFor(staff);
+      if (!byPerson.has(key)) {
+        byPerson.set(key, {
+          key, name: staff.name, position: staff.position, department: staff.department,
+          projects: new Set(), assigned: 0, completed: 0, completedOnTime: 0, completedLate: 0,
+          overdueOpen: 0, blocked: 0, doing: 0, todo: 0,
+        });
+      }
+      const agg = byPerson.get(key);
+      agg.projects.add(projectNameById.get(t.project_id) || "");
+      agg.assigned++;
+      if (t.status === "done") {
+        agg.completed++;
+        // Không có ngày hoàn thành riêng — dùng thời điểm cập nhật trạng thái
+        // gần nhất (updated_at) so với hạn (due_date) để coi là đúng/trễ hạn.
+        const completedDateStr = t.updated_at ? new Date(t.updated_at).toISOString().slice(0, 10) : null;
+        if (!t.due_date || !completedDateStr || completedDateStr <= t.due_date) agg.completedOnTime++;
+        else agg.completedLate++;
+      } else if (t.status === "blocked") {
+        agg.blocked++;
+      } else if (t.status === "doing") {
+        agg.doing++;
+      } else {
+        agg.todo++;
+      }
+      if (t.status !== "done" && t.due_date && t.due_date < todayStr) agg.overdueOpen++;
     }
-    const agg = byPerson.get(key);
-    agg.projects.add(projectNameById.get(t.project_id) || "");
-    agg.assigned++;
-    if (t.status === "done") {
-      agg.completed++;
-      // Không có ngày hoàn thành riêng — dùng thời điểm cập nhật trạng thái
-      // gần nhất (updated_at) so với hạn (due_date) để coi là đúng/trễ hạn.
-      const completedDateStr = t.updated_at ? new Date(t.updated_at).toISOString().slice(0, 10) : null;
-      if (!t.due_date || !completedDateStr || completedDateStr <= t.due_date) agg.completedOnTime++;
-      else agg.completedLate++;
-    } else if (t.status === "blocked") {
-      agg.blocked++;
-    } else if (t.status === "doing") {
-      agg.doing++;
-    } else {
-      agg.todo++;
-    }
-    if (t.status !== "done" && t.due_date && t.due_date < todayStr) agg.overdueOpen++;
   }
 
   const ranking = Array.from(byPerson.values()).map(a => {
@@ -172,15 +191,15 @@ router.get("/kpi", (req, res) => {
 router.get("/my-tasks", (req, res) => {
   const myStaff = db.prepare("SELECT * FROM staff WHERE linked_user_id = ?").all(req.user.id);
   if (myStaff.length === 0) return res.json({ tasks: [] });
-  const staffIds = myStaff.map(s => s.id);
-  const placeholders = staffIds.map(() => "?").join(",");
+  const staffIds = new Set(myStaff.map(s => s.id));
   const tasks = db
     .prepare(
       `SELECT t.*, p.name AS project_name FROM tasks t
        JOIN projects p ON p.id = t.project_id
-       WHERE t.assignee_staff_id IN (${placeholders})`
+       WHERE t.assignee_staff_ids != '[]'`
     )
-    .all(...staffIds);
+    .all()
+    .filter(t => parseAssigneeIds(t.assignee_staff_ids).some(id => staffIds.has(id)));
   const todayStr = new Date().toISOString().slice(0, 10);
   res.json({
     tasks: tasks.map(t => ({
@@ -200,15 +219,17 @@ router.get("/by-person", (req, res) => {
   if (projectIds.length === 0) return res.json({ tasks: [] });
   const placeholders = projectIds.map(() => "?").join(",");
   const allStaff = db.prepare(`SELECT * FROM staff`).all();
-  const matchStaffIds = allStaff
-    .filter(s => (s.phone ? `phone:${s.phone}` : `name:${s.name}|${s.department}`) === key)
-    .map(s => s.id);
-  if (matchStaffIds.length === 0) return res.json({ tasks: [] });
-  const sPlaceholders = matchStaffIds.map(() => "?").join(",");
+  const matchStaffIds = new Set(
+    allStaff
+      .filter(s => (s.phone ? `phone:${s.phone}` : `name:${s.name}|${s.department}`) === key)
+      .map(s => s.id)
+  );
+  if (matchStaffIds.size === 0) return res.json({ tasks: [] });
   const projectNameById = new Map(db.prepare(`SELECT id, name FROM projects WHERE id IN (${placeholders})`).all(...projectIds).map(p => [p.id, p.name]));
   const tasks = db
-    .prepare(`SELECT * FROM tasks WHERE assignee_staff_id IN (${sPlaceholders})`)
-    .all(...matchStaffIds);
+    .prepare(`SELECT * FROM tasks WHERE project_id IN (${placeholders}) AND assignee_staff_ids != '[]'`)
+    .all(...projectIds)
+    .filter(t => parseAssigneeIds(t.assignee_staff_ids).some(id => matchStaffIds.has(id)));
   const todayStr = new Date().toISOString().slice(0, 10);
   res.json({
     tasks: tasks.map(t => ({
@@ -222,24 +243,19 @@ router.get("/by-person", (req, res) => {
 
 /* ---------------- Xuất báo cáo tổng hợp + KPI ra PDF / Word ---------------- */
 
-function getOverviewData(userId) {
+function getOverviewData() {
   // Dùng lại đúng logic của route /overview (tách thành hàm để export dùng chung).
   const projectIds = allProjectIds();
   const projects = db.prepare(`SELECT id, name FROM projects WHERE id IN (${projectIds.map(() => "?").join(",") || "''"})`).all(...projectIds);
   const allTasks = projectIds.length
     ? db.prepare(`SELECT * FROM tasks WHERE project_id IN (${projectIds.map(() => "?").join(",")})`).all(...projectIds)
     : [];
-  const allStaff = projectIds.length
-    ? db.prepare(`SELECT * FROM staff`).all()
-    : [];
+  const allStaff = db.prepare(`SELECT * FROM staff`).all();
   const staffById = new Map(allStaff.map(s => [s.id, s]));
   const projectNameById = new Map(projects.map(p => [p.id, p.name]));
+  const labelFor = makeLabelFor(staffById);
   const todayStr = new Date().toISOString().slice(0, 10);
   const in2days = new Date(Date.now() + 2 * 86400000).toISOString().slice(0, 10);
-  function labelFor(t) {
-    if (t.assignee_staff_id && staffById.has(t.assignee_staff_id)) return staffById.get(t.assignee_staff_id).name;
-    return t.assignee || "Chưa gán";
-  }
   const perProject = new Map(projects.map(p => [p.id, { id: p.id, name: p.name, total: 0, done: 0, doing: 0, todo: 0, blocked: 0, overdue: 0 }]));
   const overdueList = [];
   const dueSoonList = [];
@@ -265,7 +281,7 @@ function getOverviewData(userId) {
 router.get("/overview/export", async (req, res) => {
   const format = req.query.format === "docx" ? "docx" : "pdf";
   try {
-    const overview = getOverviewData(req.user.id);
+    const overview = getOverviewData();
     const kpi = computeKpiRanking();
     const { buildOverviewPdf, buildOverviewDocx } = require("../export");
     const buffer = format === "docx" ? await buildOverviewDocx(overview, kpi) : await buildOverviewPdf(overview, kpi);

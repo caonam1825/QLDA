@@ -1,10 +1,72 @@
-import { useState, memo } from "react";
+import { useState, memo, useRef, useEffect } from "react";
 import {
   ChevronDown, ChevronRight, Building2, CalendarDays, AlertTriangle,
-  ArrowUp, ArrowDown, Trash2, User, Lock, Unlock,
+  ArrowUp, ArrowDown, Trash2, User, Users, Lock, Unlock, Check, X as XIcon,
 } from "lucide-react";
 import { STATUS, isOverdue } from "../constants";
 import { IconBtn, ConfirmButton, DebouncedInput, DebouncedTextarea } from "./Basics";
+
+// Chọn NHIỀU người phụ trách cho 1 công việc — nút hiện tóm tắt, bấm mở ra
+// danh sách tích chọn (giống kiểu tích chọn nhân viên đã dùng ở nơi khác).
+function AssigneeMultiSelect({ ids, staffList, disabled, onChange }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onClickOutside(e) {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, [open]);
+
+  const selected = staffList.filter(s => ids.includes(s.id));
+  const summary = selected.length === 0
+    ? "— Chưa gán —"
+    : selected.length === 1
+      ? selected[0].name
+      : `${selected[0].name} +${selected.length - 1} người khác`;
+
+  function toggle(staffId) {
+    const next = ids.includes(staffId) ? ids.filter(id => id !== staffId) : [...ids, staffId];
+    onChange(next);
+  }
+
+  return (
+    <div className="assignee-multiselect" ref={boxRef}>
+      <button
+        type="button" className="assignee-multiselect-btn" disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+      >
+        <Users size={12} /> {summary}
+      </button>
+      {open && (
+        <div className="assignee-multiselect-panel">
+          {staffList.length === 0 && <p className="invite-hint">Chưa có nhân viên nào trong dự án — vào mục "Nhân viên" để thêm.</p>}
+          {staffList.map(s => {
+            const checked = ids.includes(s.id);
+            return (
+              <button
+                type="button" key={s.id}
+                className={`assignee-multiselect-item ${checked ? "assignee-multiselect-item-on" : ""}`}
+                onClick={() => toggle(s.id)}
+              >
+                <span className={`staff-check-btn ${checked ? "staff-check-btn-on" : ""}`}>{checked && <Check size={11} />}</span>
+                {s.name}{s.position ? <span className="report-item-meta-inline"> · {s.position}</span> : ""}
+              </button>
+            );
+          })}
+          {selected.length > 0 && (
+            <button type="button" className="assignee-multiselect-clear" onClick={() => onChange([])}>
+              <XIcon size={11} /> Bỏ chọn tất cả
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function TaskRow({
   task, code, staffList, onProgressChange, onFieldChange, onDelete, onMove,
@@ -16,11 +78,11 @@ function TaskRow({
   const StIcon = st.icon;
   const overdue = isOverdue(entry.due, entry.status);
   const indent = task.level >= 4 ? 1 : 0;
-  const [customMode, setCustomMode] = useState(!!entry.assignee && !entry.assigneeStaffId);
-  const usingCustomName = customMode && !entry.assigneeStaffId;
-  const assigneeLabel = entry.assigneeStaffId
-    ? (staffList.find(s => s.id === entry.assigneeStaffId)?.name || "")
-    : entry.assignee;
+  const assigneeIds = entry.assigneeStaffIds || (entry.assigneeStaffId ? [entry.assigneeStaffId] : []);
+  const [customMode, setCustomMode] = useState(!!entry.assignee && assigneeIds.length === 0);
+  const usingCustomName = customMode && assigneeIds.length === 0;
+  const assigneeNames = staffList.filter(s => assigneeIds.includes(s.id)).map(s => s.name);
+  const assigneeLabel = assigneeNames.length ? assigneeNames.join(", ") : entry.assignee;
 
   const canEditFields = !!perms?.editTaskFields;
   const canEditProgress = !!perms?.editProgress;
@@ -112,21 +174,18 @@ function TaskRow({
               </select>
             </label>
             <label className="field">
-              <span className="field-label">Người phụ trách</span>
-              <select
-                disabled={!canEditProgress}
-                value={usingCustomName ? "__custom__" : (entry.assigneeStaffId || "")}
-                onChange={e => {
-                  const v = e.target.value;
-                  if (v === "__custom__") { setCustomMode(true); onProgressChange(task.id, { assigneeStaffId: "" }); }
-                  else { setCustomMode(false); onProgressChange(task.id, { assigneeStaffId: v, assignee: "" }); }
-                }}
+              <span className="field-label">Người phụ trách (chọn được nhiều người)</span>
+              <AssigneeMultiSelect
+                ids={assigneeIds} staffList={staffList} disabled={!canEditProgress}
+                onChange={(next) => { setCustomMode(false); onProgressChange(task.id, { assigneeStaffIds: next, assignee: next.length ? "" : entry.assignee }); }}
+              />
+              <button
+                type="button" className="assignee-custom-toggle" disabled={!canEditProgress}
+                onClick={() => setCustomMode(m => !m)}
               >
-                <option value="">— Chưa gán —</option>
-                {staffList.map(s => <option key={s.id} value={s.id}>{s.name}{s.position ? ` (${s.position})` : ""}</option>)}
-                <option value="__custom__">Khác (nhập tay)…</option>
-              </select>
-              {usingCustomName && (
+                {usingCustomName || customMode ? "Ẩn ô nhập tay" : "+ Thêm người ngoài danh bạ (nhập tay)"}
+              </button>
+              {(customMode) && (
                 <DebouncedInput
                   type="text" disabled={!canEditProgress}
                   placeholder="Nhập tên người phụ trách…"

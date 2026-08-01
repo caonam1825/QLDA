@@ -39,6 +39,34 @@ router.delete("/users/:id/reject", (req, res) => {
   res.json({ ok: true });
 });
 
+// Xoá VĨNH VIỄN 1 tài khoản đã đăng ký (đã duyệt) khỏi hệ thống. Không xoá
+// được chính mình, và không xoá được người đang là Chủ dự án của bất kỳ dự
+// án nào (cần xoá/chuyển nhượng dự án đó trước, để tránh xoá nhầm cả dự án
+// theo — chủ dự án bị xoá sẽ kéo theo cascade xoá dự án).
+router.delete("/users/:id", (req, res) => {
+  if (req.params.id === req.user.id) {
+    return res.status(400).json({ error: "Không thể tự xoá tài khoản của chính mình" });
+  }
+  const user = db.prepare("SELECT id FROM users WHERE id = ?").get(req.params.id);
+  if (!user) return res.status(404).json({ error: "Không tìm thấy người dùng" });
+
+  const ownedProjects = db.prepare("SELECT name FROM projects WHERE owner_id = ?").all(req.params.id);
+  if (ownedProjects.length > 0) {
+    return res.status(400).json({
+      error: `Người này đang là Chủ dự án của ${ownedProjects.length} dự án (${ownedProjects.map(p => p.name).join(", ")}) — cần xoá dự án đó hoặc đổi chủ dự án trước khi xoá tài khoản.`,
+    });
+  }
+
+  const tx = db.transaction(() => {
+    // Nhân viên từng liên kết tài khoản này thì gỡ liên kết (vẫn giữ hồ sơ
+    // nhân viên trong danh bạ, chỉ mất quyền đăng nhập).
+    db.prepare("UPDATE staff SET linked_user_id = '' WHERE linked_user_id = ?").run(req.params.id);
+    db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id); // project_members tự xoá theo (ON DELETE CASCADE)
+  });
+  tx();
+  res.json({ ok: true });
+});
+
 // Cấp / thu hồi quyền Quản trị hệ thống cho một người dùng khác.
 router.patch("/users/:id/super-admin", (req, res) => {
   const { value } = req.body || {};

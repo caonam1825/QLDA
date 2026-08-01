@@ -92,7 +92,34 @@ function serializeGroup(g) {
   return { id: g.id, phase: g.phase, name: g.name, order: g.sort_order };
 }
 
+// Một công việc giờ có thể giao cho NHIỀU người — lưu dạng mảng JSON các
+// staff.id trong cột assignee_staff_ids. parseAssigneeIds/luôn trả về mảng
+// hợp lệ dù dữ liệu cũ/hỏng.
+function parseAssigneeIds(raw) {
+  try {
+    const arr = JSON.parse(raw || "[]");
+    return Array.isArray(arr) ? arr.filter(Boolean) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+// Gỡ 1 staffId khỏi cột assignee_staff_ids (mảng JSON) của mọi công việc có
+// giao cho người đó — dùng khi bỏ tích/xoá nhân viên khỏi dự án hoặc khỏi
+// toàn hệ thống, để không còn "giao việc ma" cho người không còn liên quan.
+function unassignStaffFromTasks(staffId, projectId) {
+  const rows = projectId
+    ? db.prepare("SELECT id, assignee_staff_ids FROM tasks WHERE project_id = ? AND assignee_staff_ids LIKE ?").all(projectId, `%${staffId}%`)
+    : db.prepare("SELECT id, assignee_staff_ids FROM tasks WHERE assignee_staff_ids LIKE ?").all(`%${staffId}%`);
+  const update = db.prepare("UPDATE tasks SET assignee_staff_ids = ?, assignee_staff_id = ? WHERE id = ?");
+  for (const t of rows) {
+    const ids = parseAssigneeIds(t.assignee_staff_ids).filter(id => id !== staffId);
+    update.run(JSON.stringify(ids), ids[0] || "", t.id);
+  }
+}
+
 function serializeTask(t) {
+  const assigneeStaffIds = parseAssigneeIds(t.assignee_staff_ids);
   return {
     id: t.id,
     phase: t.phase,
@@ -108,7 +135,8 @@ function serializeTask(t) {
     progress: {
       status: t.status,
       assignee: t.assignee,
-      assigneeStaffId: t.assignee_staff_id || "",
+      assigneeStaffIds,
+      assigneeStaffId: assigneeStaffIds[0] || "", // tương thích ngược cho code cũ
       due: t.due_date,
       note: t.progress_note,
       dueLocked: !!t.due_locked,
@@ -470,12 +498,23 @@ router.patch("/tasks/:taskId/progress", (req, res) => {
   const access = requireProjectAccess(req, res, projectId, "editProgress");
   if (!access) return;
   const task = db.prepare("SELECT * FROM tasks WHERE id = ?").get(req.params.taskId);
-  const { status, assignee, assigneeStaffId, due, note } = req.body || {};
+  const { status, assignee, assigneeStaffId, assigneeStaffIds, due, note } = req.body || {};
   const sets = [];
   const vals = [];
   if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
   if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
-  if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
+  // Giao cho nhiều người: assigneeStaffIds (mảng) là cách chuẩn từ nay; vẫn
+  // hỗ trợ assigneeStaffId (1 người) cho tương thích ngược — coi như mảng 1
+  // phần tử (hoặc mảng rỗng nếu bỏ chọn).
+  if (assigneeStaffIds !== undefined) {
+    const ids = Array.isArray(assigneeStaffIds) ? assigneeStaffIds.filter(Boolean) : [];
+    sets.push("assignee_staff_ids = ?"); vals.push(JSON.stringify(ids));
+    sets.push("assignee_staff_id = ?"); vals.push(ids[0] || ""); // giữ cột cũ đồng bộ, phòng code cũ còn đọc
+  } else if (assigneeStaffId !== undefined) {
+    const ids = assigneeStaffId ? [assigneeStaffId] : [];
+    sets.push("assignee_staff_ids = ?"); vals.push(JSON.stringify(ids));
+    sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId);
+  }
   if (due !== undefined) {
     if (task.due_locked) {
       return res.status(423).json({ error: "Hạn hoàn thành đã bị khoá làm căn cứ tính KPI — chỉ chủ dự án được mở khoá trước khi sửa." });
@@ -494,27 +533,42 @@ router.patch("/tasks/:taskId/progress", (req, res) => {
 // trương đầu tư") — áp dụng người phụ trách/trạng thái/hạn cho TẤT CẢ công
 // việc trong nhóm cùng lúc, không phải tích từng dòng bên trong. Việc nào
 // đã bị khoá hạn thì bỏ qua phần hạn của riêng việc đó (không lỗi cả loạt).
+// Dùng chung cho 2 route "giao tiến độ hàng loạt" (theo nhóm / theo giai
+// đoạn) — trả về {sets, vals} cho 1 dòng UPDATE, hỗ trợ giao nhiều người.
+function buildBulkAssignUpdate(body, task, userId, now) {
+  const { status, assigneeStaffId, assigneeStaffIds, assignee, due } = body || {};
+  const sets = [];
+  const vals = [];
+  if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
+  if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
+  if (assigneeStaffIds !== undefined) {
+    const ids = Array.isArray(assigneeStaffIds) ? assigneeStaffIds.filter(Boolean) : [];
+    sets.push("assignee_staff_ids = ?"); vals.push(JSON.stringify(ids));
+    sets.push("assignee_staff_id = ?"); vals.push(ids[0] || "");
+  } else if (assigneeStaffId !== undefined) {
+    const ids = assigneeStaffId ? [assigneeStaffId] : [];
+    sets.push("assignee_staff_ids = ?"); vals.push(JSON.stringify(ids));
+    sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId);
+  }
+  if (due !== undefined && !task.due_locked) { sets.push("due_date = ?"); vals.push(due); }
+  if (!sets.length) return null;
+  sets.push("updated_by = ?"); vals.push(userId);
+  sets.push("updated_at = ?"); vals.push(now);
+  return { sets, vals };
+}
+
 router.patch("/groups/:groupId/bulk-progress", (req, res) => {
   const projectId = projectIdOfGroup(req.params.groupId);
   if (!projectId) return res.status(404).json({ error: "Không tìm thấy nhóm" });
   const access = requireProjectAccess(req, res, projectId, "editProgress");
   if (!access) return;
-  const { status, assigneeStaffId, assignee, due } = req.body || {};
   const tasks = db.prepare("SELECT * FROM tasks WHERE group_id = ?").all(req.params.groupId);
   const now = Date.now();
   const tx = db.transaction(() => {
     for (const t of tasks) {
-      const sets = [];
-      const vals = [];
-      if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
-      if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
-      if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
-      if (due !== undefined && !t.due_locked) { sets.push("due_date = ?"); vals.push(due); }
-      if (!sets.length) continue;
-      sets.push("updated_by = ?"); vals.push(req.user.id);
-      sets.push("updated_at = ?"); vals.push(now);
-      vals.push(t.id);
-      db.prepare(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+      const built = buildBulkAssignUpdate(req.body, t, req.user.id, now);
+      if (!built) continue;
+      db.prepare(`UPDATE tasks SET ${built.sets.join(", ")} WHERE id = ?`).run(...built.vals, t.id);
     }
   });
   tx();
@@ -527,22 +581,13 @@ router.patch("/groups/:groupId/bulk-progress", (req, res) => {
 router.patch("/:id/phases/:phaseKey/bulk-progress", (req, res) => {
   const access = requireProjectAccess(req, res, req.params.id, "editProgress");
   if (!access) return;
-  const { status, assigneeStaffId, assignee, due } = req.body || {};
   const tasks = db.prepare("SELECT * FROM tasks WHERE project_id = ? AND phase = ?").all(req.params.id, req.params.phaseKey);
   const now = Date.now();
   const tx = db.transaction(() => {
     for (const t of tasks) {
-      const sets = [];
-      const vals = [];
-      if (status !== undefined) { sets.push("status = ?"); vals.push(status); }
-      if (assigneeStaffId !== undefined) { sets.push("assignee_staff_id = ?"); vals.push(assigneeStaffId); }
-      if (assignee !== undefined) { sets.push("assignee = ?"); vals.push(assignee); }
-      if (due !== undefined && !t.due_locked) { sets.push("due_date = ?"); vals.push(due); }
-      if (!sets.length) continue;
-      sets.push("updated_by = ?"); vals.push(req.user.id);
-      sets.push("updated_at = ?"); vals.push(now);
-      vals.push(t.id);
-      db.prepare(`UPDATE tasks SET ${sets.join(", ")} WHERE id = ?`).run(...vals);
+      const built = buildBulkAssignUpdate(req.body, t, req.user.id, now);
+      if (!built) continue;
+      db.prepare(`UPDATE tasks SET ${built.sets.join(", ")} WHERE id = ?`).run(...built.vals, t.id);
     }
   });
   tx();
@@ -715,7 +760,7 @@ router.put("/:id/staff-selection", (req, res) => {
     }
     for (const sid of toRemove) {
       db.prepare("DELETE FROM project_staff WHERE project_id = ? AND staff_id = ?").run(req.params.id, sid);
-      db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE project_id = ? AND assignee_staff_id = ?").run(req.params.id, sid);
+      unassignStaffFromTasks(sid, req.params.id);
     }
   });
   tx();
@@ -729,7 +774,7 @@ router.delete("/:id/staff/:staffId", (req, res) => {
   if (!access) return;
   const tx = db.transaction(() => {
     db.prepare("DELETE FROM project_staff WHERE project_id = ? AND staff_id = ?").run(req.params.id, req.params.staffId);
-    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE project_id = ? AND assignee_staff_id = ?").run(req.params.id, req.params.staffId);
+    unassignStaffFromTasks(req.params.staffId, req.params.id);
   });
   tx();
   res.json({ project: fullProject(req.params.id, access.role) });
@@ -741,7 +786,7 @@ router.delete("/staff-directory/:staffId", (req, res) => {
   const staff = db.prepare("SELECT id FROM staff WHERE id = ?").get(req.params.staffId);
   if (!staff) return res.status(404).json({ error: "Không tìm thấy nhân viên" });
   const tx = db.transaction(() => {
-    db.prepare("UPDATE tasks SET assignee_staff_id = '' WHERE assignee_staff_id = ?").run(req.params.staffId);
+    unassignStaffFromTasks(req.params.staffId);
     db.prepare("DELETE FROM project_staff WHERE staff_id = ?").run(req.params.staffId);
     db.prepare("DELETE FROM staff WHERE id = ?").run(req.params.staffId);
   });
@@ -815,10 +860,15 @@ function computeProjectReport(projectId, range) {
   const staffList = db.prepare("SELECT * FROM staff").all();
   const staffById = new Map(staffList.map(s => [s.id, s]));
 
+  function labelNames(t) {
+    const ids = parseAssigneeIds(t.assignee_staff_ids);
+    const names = ids.map(id => staffById.get(id)?.name).filter(Boolean);
+    if (names.length) return names;
+    if (t.assignee) return [t.assignee];
+    return ["Chưa gán"];
+  }
   function labelFor(t) {
-    if (t.assignee_staff_id && staffById.has(t.assignee_staff_id)) return staffById.get(t.assignee_staff_id).name;
-    if (t.assignee) return t.assignee;
-    return "Chưa gán";
+    return labelNames(t).join(", ");
   }
   function toItem(t) {
     return {
@@ -859,10 +909,12 @@ function computeProjectReport(projectId, range) {
     return byStaffMap.get(name);
   }
   for (const t of allTasks) {
-    const name = labelFor(t);
-    const b = bucket(name);
-    b[t.status] = (b[t.status] || 0) + 1;
-    if (t.due_date && t.status !== "done" && t.due_date < todayStr) b.overdue++;
+    const names = labelNames(t);
+    for (const name of names) {
+      const b = bucket(name);
+      b[t.status] = (b[t.status] || 0) + 1;
+      if (t.due_date && t.status !== "done" && t.due_date < todayStr) b.overdue++;
+    }
   }
 
   return {

@@ -232,10 +232,12 @@ Dockerfile          Build multi-stage: build client rồi đóng gói cùng serv
   trị hệ thống" → "Đang chờ phê duyệt") mới đăng nhập được — chặn người lạ tự
   tạo tài khoản truy cập hệ thống. Tài khoản do admin cấp trực tiếp (qua mục
   Nhân viên) được duyệt tự động, không cần thao tác thêm.
-- **Thành viên dự án — tích chọn từ nhân viên đã có tài khoản**: mục "Thành
-  viên" trong dự án giờ hiển thị sẵn danh sách nhân viên đã có tài khoản đăng
-  nhập để tích chọn nhanh (kèm chọn quyền), thay vì phải gõ lại số điện thoại
-  — vẫn giữ ô nhập SĐT thủ công cho trường hợp cần thêm người ngoài danh bạ.
+- **Tích chọn nhân viên & cấp quyền ngay trong 1 màn hình**: mục "Nhân viên"
+  trong dự án giờ gộp cả 2 việc — tích ô vuông để thêm người vào dự án
+  (không cần gõ tên/SĐT), và nếu người đó đã có tài khoản đăng nhập thì bấm
+  "+ Cấp quyền chỉnh sửa" ngay trên cùng dòng để họ tự sửa được dữ liệu (đổi
+  quyền/thu hồi quyền cũng làm ngay tại đó). Mục "Thành viên" riêng vẫn còn
+  cho ai muốn quản lý quyền theo cách cũ.
 - **Cập nhật thông tin cá nhân**: bấm vào avatar (chữ cái đầu tên) ở góc màn
   hình để sửa họ tên/chức vụ/email, đổi mật khẩu, hoặc **tự kết nối Zalo
   ngay** (lấy mã liên kết cho chính mình, không cần nhờ quản trị dự án) —
